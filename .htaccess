@@ -1,0 +1,28 @@
+Options -Indexes
+
+ErrorDocument 400 /php_action/error.php?code=400
+ErrorDocument 401 /php_action/error.php?code=401
+ErrorDocument 403 /php_action/error.php?code=403
+ErrorDocument 404 /dist/index.html
+ErrorDocument 500 /php_action/error.php?code=500
+ErrorDocument 501 /php_action/error.php?code=501
+ErrorDocument 503 /php_action/error.php?code=503
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Allow backend API and existing product assets directly
+  RewriteRule ^php_action/ - [L]
+  RewriteRule ^assests/ - [L]
+
+  # Serve compiled Vite assets from dist/assets when hosted at project root
+  RewriteRule ^assets/(.*)$ dist/assets/$1 [L]
+
+  # If a real file or directory exists, serve it
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # SPA History API fallback to built Vite index.html
+  RewriteRule ^ dist/index.html [L]
+</IfModule>
