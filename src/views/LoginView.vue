@@ -147,6 +147,7 @@ import {
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { findUnsafeField } from '@/utils/security'
 
 const route = useRoute()
 const router = useRouter()
@@ -164,6 +165,11 @@ async function submitLogin() {
   errorMsg.value = ''
   if (!form.username || !form.password) {
     errorMsg.value = 'Por favor ingresa tu usuario y contraseña.'
+    return
+  }
+  const unsafe = findUnsafeField({ Usuario: form.username })
+  if (unsafe) {
+    errorMsg.value = `El campo "${unsafe}" contiene caracteres o código no permitido.`
     return
   }
 

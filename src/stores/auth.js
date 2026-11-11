@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import apiClient, { extractErrorMessage } from '@/api/client'
+import apiClient, {
+  clearCsrfToken,
+  extractErrorMessage,
+  setCsrfToken,
+} from '@/api/client'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -14,6 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     try {
       const { data } = await apiClient.get('/checkAuth.php', { skipErrorRedirect: true })
+      if (data?.csrfToken) setCsrfToken(data.csrfToken)
       authenticated.value = Boolean(data?.authenticated)
       user.value = data?.user || null
     } catch {
@@ -33,6 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
         { username, password },
         { skipErrorRedirect: true }
       )
+      if (data?.csrfToken) setCsrfToken(data.csrfToken)
       authenticated.value = Boolean(data?.authenticated)
       user.value = data?.user || null
       checked.value = true
@@ -48,6 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await apiClient.post('/logout.php', {}, { skipErrorRedirect: true })
     } finally {
+      clearCsrfToken()
       clearSession()
     }
   }
@@ -74,6 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
       ...payload,
       user_id: user.value?.user_id,
     })
+    if (data?.csrfToken) setCsrfToken(data.csrfToken)
     return data
   }
 

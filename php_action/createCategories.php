@@ -4,11 +4,11 @@ require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
 $data = get_request_data();
-$categoriesName = trim((string)($data['categoriesName'] ?? ''));
+$categoriesName = sanitize_clean_text($data['categoriesName'] ?? '', 'nombre de la categoría', 150, true);
 $categoriesStatus = (int)($data['categoriesStatus'] ?? 0);
 
-if ($categoriesName === '' || !in_array($categoriesStatus, [1, 2], true)) {
-    send_http_error(400, 'Nombre y estado válido son obligatorios para crear la categoría.');
+if (!in_array($categoriesStatus, [1, 2], true)) {
+    send_http_error(400, 'Estado válido es obligatorio para crear la categoría.');
 }
 
 $stmt = $connect->prepare('INSERT INTO categories (categories_name, categories_active, categories_status) VALUES (?, ?, 1)');

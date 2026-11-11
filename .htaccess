@@ -4,19 +4,51 @@ ErrorDocument 400 /php_action/error.php?code=400
 ErrorDocument 401 /php_action/error.php?code=401
 ErrorDocument 403 /php_action/error.php?code=403
 ErrorDocument 404 /dist/index.html
+ErrorDocument 405 /php_action/error.php?code=405
+ErrorDocument 408 /php_action/error.php?code=408
+ErrorDocument 422 /php_action/error.php?code=422
+ErrorDocument 429 /php_action/error.php?code=429
 ErrorDocument 500 /php_action/error.php?code=500
 ErrorDocument 501 /php_action/error.php?code=501
+ErrorDocument 502 /php_action/error.php?code=502
 ErrorDocument 503 /php_action/error.php?code=503
+ErrorDocument 504 /php_action/error.php?code=504
+
+# Block access to sensitive internal files and hidden directories
+<FilesMatch "(^\.|pos_stock\.sql$|error_log$|package(-lock)?\.json$|vite\.config\.js$)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header always set X-XSS-Protection "0"
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+</IfModule>
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Allow backend API and existing product assets directly
+  # Block hidden files & git metadata
+  RewriteRule (^|/)\. - [F,L]
+
+  # Allow backend API and product media directly
   RewriteRule ^php_action/ - [L]
-  RewriteRule ^assests/ - [L]
+  RewriteRule ^assests/images/ - [L]
 
   # Serve compiled Vite assets from dist/assets when hosted at project root
   RewriteRule ^assets/(.*)$ dist/assets/$1 [L]
+
+  # If root path requested, serve built SPA index.html
+  RewriteRule ^$ dist/index.html [L]
 
   # If a real file or directory exists, serve it
   RewriteCond %{REQUEST_FILENAME} -f [OR]

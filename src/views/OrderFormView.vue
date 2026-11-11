@@ -267,6 +267,7 @@ import { useOrdersStore } from '@/stores/orders'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
+import { findUnsafeField } from '@/utils/security'
 
 const route = useRoute()
 const router = useRouter()
@@ -354,6 +355,14 @@ function resetForm() {
 }
 
 async function submitOrder() {
+  const unsafe = findUnsafeField({
+    'Nombre del cliente': form.clientName,
+    'Teléfono del cliente': form.clientContact,
+  })
+  if (unsafe) {
+    ui.error(`El campo "${unsafe}" contiene código o caracteres no permitidos.`)
+    return
+  }
   const validItems = form.items.filter((i) => i.productId > 0 && i.quantity > 0)
   if (validItems.length === 0) {
     ui.warning('Debes seleccionar al menos un producto con cantidad válida.')

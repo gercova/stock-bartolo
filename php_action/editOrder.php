@@ -6,24 +6,34 @@ require_method(['POST', 'PUT']);
 $data = get_request_data();
 
 $orderId = (int)($data['orderId'] ?? 0);
-$rawDate = trim((string)($data['orderDate'] ?? ''));
-$clientName = trim((string)($data['clientName'] ?? ''));
-$clientContact = trim((string)($data['clientContact'] ?? ''));
+$orderDate = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
+$clientName = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
+$clientContact = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
 $discount = round((float)($data['discount'] ?? 0), 2);
 $paid = round((float)($data['paid'] ?? 0), 2);
 $paymentType = (int)($data['paymentType'] ?? 0);
 $paymentStatus = (int)($data['paymentStatus'] ?? 0);
 $items = $data['items'] ?? [];
 
-if ($orderId <= 0 || $rawDate === '' || $clientName === '' || $clientContact === '' || $paymentType <= 0 || $paymentStatus <= 0 || !is_array($items) || count($items) === 0) {
-    send_http_error(400, 'Completa todos los campos obligatorios de la orden.');
+if ($orderId <= 0 || $discount < 0 || $paid < 0 || !in_array($paymentType, [1, 2, 3], true) || !in_array($paymentStatus, [1, 2, 3], true) || !is_array($items) || count($items) === 0) {
+    send_http_error(400, 'Completa todos los campos obligatorios de la orden con valores válidos.');
 }
-
-$orderDate = date('Y-m-d', strtotime($rawDate));
 
 $connect->begin_transaction();
 
 try {
+    $checkStmt = $connect->prepare('SELECT order_id FROM orders WHERE order_id = ? AND order_status = 1 FOR UPDATE');
+    $checkStmt->bind_param('i', $orderId);
+    $checkStmt->execute();
+    $existingOrder = $checkStmt->get_result()->fetch_assoc();
+    $checkStmt->close();
+
+    if (!$existingOrder) {
+        $connect->rollback();
+        $connect->close();
+        send_http_error(404, 'Orden no encontrada.');
+    }
+
     // Restore previous quantities to stock
     $oldStmt = $connect->prepare('SELECT product_id, quantity FROM order_item WHERE order_id = ? AND order_item_status = 1');
     $oldStmt->bind_param('i', $orderId);
@@ -53,6 +63,9 @@ try {
     $updProdStmt = $connect->prepare('UPDATE product SET quantity = ? WHERE product_id = ?');
 
     foreach ($items as $item) {
+        if (!is_array($item)) {
+            throw new InvalidArgumentException('Formato de fila de producto inválido.');
+        }
         $productId = (int)($item['productId'] ?? $item['product_id'] ?? 0);
         $qty = (int)($item['quantity'] ?? 0);
         if ($productId <= 0 || $qty <= 0) {
@@ -65,7 +78,7 @@ try {
         $product = $prodRes ? $prodRes->fetch_assoc() : null;
 
         if (!$product) {
-            throw new RuntimeException('Producto #' . $productId . ' no encontrado.');
+            throw new InvalidArgumentException('Producto #' . $productId . ' no encontrado.');
         }
 
         $currentStock = (int)$product['quantity'];
@@ -147,5 +160,6 @@ try {
 } catch (Throwable $e) {
     $connect->rollback();
     $connect->close();
-    send_http_error(500, 'No se pudo actualizar la orden: ' . $e->getMessage());
+    error_log('[stock-bartolo] editOrder error: ' . $e->getMessage());
+    send_http_error(500, 'No se pudo actualizar la orden.');
 }

@@ -9,7 +9,7 @@ $payAmount = round((float)($data['payAmount'] ?? 0), 2);
 $paymentType = (int)($data['paymentType'] ?? 0);
 $paymentStatus = (int)($data['paymentStatus'] ?? 0);
 
-if ($orderId <= 0 || $payAmount < 0 || $paymentType <= 0 || $paymentStatus <= 0) {
+if ($orderId <= 0 || $payAmount < 0 || !in_array($paymentType, [1, 2, 3], true) || !in_array($paymentStatus, [1, 2, 3], true)) {
     send_http_error(400, 'Datos de pago inválidos.');
 }
 

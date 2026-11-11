@@ -1,11 +1,16 @@
 <?php
 
 require_once __DIR__ . '/http_error.php';
+require_once __DIR__ . '/security.php';
+
+configure_secure_php_environment();
+send_security_headers(false);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
+        'secure' => is_https_request(),
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -13,8 +18,11 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 set_exception_handler(function (Throwable $e): void {
-    send_http_error(500, 'Error interno del servidor: ' . $e->getMessage());
+    error_log('[stock-bartolo] Uncaught exception: ' . $e->getMessage());
+    send_http_error(500, 'Error interno del servidor al procesar la solicitud.');
 });
+
+enforce_session_timeout(7200);
 
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/ensure_schema.php';
@@ -25,22 +33,47 @@ if (!defined('SKIP_AUTH_CHECK')) {
     }
 }
 
+$csrfToken = ensure_csrf_token();
+$requestMethod = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+if (in_array($requestMethod, ['GET', 'HEAD'], true)) {
+    issue_csrf_cookie($csrfToken);
+} elseif (!defined('SKIP_CSRF_CHECK')) {
+    verify_csrf_token();
+}
+
+if (!empty($_GET)) {
+    inspect_request_payload($_GET);
+}
+
 function get_request_data(): array
 {
-    if (!empty($_POST)) {
-        return $_POST;
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
     }
+
+    if (!empty($_POST)) {
+        inspect_request_payload($_POST);
+        $cached = $_POST;
+        return $cached;
+    }
+
     $raw = file_get_contents('php://input');
     if ($raw !== false && trim($raw) !== '') {
+        if (strlen($raw) > 512 * 1024) {
+            send_http_error(400, 'El tamaño de la solicitud supera el límite permitido.');
+        }
         $decoded = json_decode($raw, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            return $decoded;
+            inspect_request_payload($decoded);
+            $cached = $decoded;
+            return $cached;
         }
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            send_http_error(400, 'El cuerpo JSON de la solicitud no es válido.');
-        }
+        send_http_error(400, 'El cuerpo JSON de la solicitud no es válido.');
     }
-    return [];
+
+    $cached = [];
+    return $cached;
 }
 
 function require_method(array $allowed): void
@@ -54,6 +87,7 @@ function require_method(array $allowed): void
 function json_response(array $payload, int $status = 200): void
 {
     http_response_code($status);
+    send_security_headers(false);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
@@ -71,9 +105,16 @@ function normalize_image_url(?string $path): string
     if (str_starts_with($clean, './')) {
         $clean = substr($clean, 2);
     }
-    $diskPath = dirname(__DIR__) . '/' . ltrim($clean, '/');
-    if (!is_file($diskPath)) {
+    $clean = ltrim($clean, '/');
+    if (str_contains($clean, '..')) {
         return 'assests/images/photo_default.png';
     }
-    return ltrim($clean, '/');
+
+    $imagesRoot = realpath(dirname(__DIR__) . '/assests/images');
+    $diskPath = realpath(dirname(__DIR__) . '/' . $clean);
+    if ($imagesRoot === false || $diskPath === false || !is_file($diskPath) || !str_starts_with($diskPath, $imagesRoot)) {
+        return 'assests/images/photo_default.png';
+    }
+
+    return $clean;
 }

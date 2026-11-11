@@ -4,12 +4,14 @@ define('SKIP_AUTH_CHECK', true);
 require_once __DIR__ . '/core.php';
 
 require_method(['GET']);
+$csrfToken = issue_csrf_cookie();
 
 if (empty($_SESSION['userId'])) {
     $connect->close();
     json_response([
         'success' => true,
         'authenticated' => false,
+        'csrfToken' => $csrfToken,
         'user' => null,
     ]);
 }
@@ -25,9 +27,11 @@ $connect->close();
 
 if (!$user) {
     $_SESSION = [];
+    $csrfToken = rotate_csrf_token();
     json_response([
         'success' => true,
         'authenticated' => false,
+        'csrfToken' => $csrfToken,
         'user' => null,
     ]);
 }
@@ -35,6 +39,7 @@ if (!$user) {
 json_response([
     'success' => true,
     'authenticated' => true,
+    'csrfToken' => $csrfToken,
     'user' => [
         'user_id' => (int)$user['user_id'],
         'username' => $user['username'],

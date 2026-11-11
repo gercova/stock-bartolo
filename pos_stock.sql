@@ -288,6 +288,25 @@ CREATE TABLE IF NOT EXISTS `loan_payments` (
   PRIMARY KEY (`payment_id`),
   KEY `idx_loan_payments_loan` (`loan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `login_attempts`
+--
+
+CREATE TABLE IF NOT EXISTS `login_attempts` (
+  `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
+  `ip_address` varchar(45) NOT NULL,
+  `username` varchar(150) NOT NULL,
+  `attempts` int(11) NOT NULL DEFAULT '0',
+  `first_attempt_at` datetime NOT NULL,
+  `locked_until` datetime DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`attempt_id`),
+  UNIQUE KEY `uniq_login_attempt_ip_user` (`ip_address`,`username`),
+  KEY `idx_login_attempts_ip_updated` (`ip_address`,`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

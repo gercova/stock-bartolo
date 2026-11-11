@@ -22,8 +22,8 @@ if ($newPassword !== $confirmPassword) {
     send_http_error(400, 'La nueva contraseña no coincide con la confirmación.');
 }
 
-if (strlen($newPassword) < 4) {
-    send_http_error(400, 'La nueva contraseña debe tener al menos 4 caracteres.');
+if (strlen($newPassword) < 4 || strlen($newPassword) > 128) {
+    send_http_error(400, 'La nueva contraseña debe tener entre 4 y 128 caracteres.');
 }
 
 $stmt = $connect->prepare('SELECT password FROM users WHERE user_id = ? LIMIT 1');
@@ -58,7 +58,11 @@ if (!$updStmt->execute()) {
 $updStmt->close();
 $connect->close();
 
+session_regenerate_id(true);
+$newCsrf = rotate_csrf_token();
+
 json_response([
     'success' => true,
     'messages' => 'Contraseña actualizada exitosamente',
+    'csrfToken' => $newCsrf,
 ]);

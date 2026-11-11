@@ -122,6 +122,9 @@ function send_http_error(int $code, string $message = '', array $details = [], ?
     http_response_code($code);
 
     $renderHtml = $forceHtml ?? prefers_html_response();
+    if (function_exists('send_security_headers')) {
+        send_security_headers($renderHtml);
+    }
 
     if ($renderHtml) {
         header('Content-Type: text/html; charset=utf-8');

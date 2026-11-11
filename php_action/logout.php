@@ -3,7 +3,7 @@
 define('SKIP_AUTH_CHECK', true);
 require_once __DIR__ . '/core.php';
 
-require_method(['POST', 'GET']);
+require_method(['POST']);
 
 $_SESSION = [];
 if (ini_get('session.use_cookies')) {
@@ -18,6 +18,7 @@ if (ini_get('session.use_cookies')) {
         $params['httponly']
     );
 }
+setcookie('XSRF-TOKEN', '', time() - 42000, '/', '', is_https_request(), false);
 session_destroy();
 $connect->close();
 

@@ -350,7 +350,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Search, Plus, Pencil, Trash2, Loader2 } from '@lucide/vue'
 import { useProductsStore } from '@/stores/products'
@@ -359,6 +359,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
+import { findUnsafeField } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -420,13 +421,19 @@ function imageSrc(path) {
   return path.startsWith('/') ? path : `/${path}`
 }
 
+function revokePreviewUrl() {
+  if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+  previewUrl.value = ''
+}
+
 function onFileSelect(e) {
   const file = e.target.files?.[0] || null
   selectedFile.value = file
+  revokePreviewUrl()
   if (file) {
     previewUrl.value = URL.createObjectURL(file)
-  } else {
-    previewUrl.value = ''
   }
 }
 
@@ -434,7 +441,7 @@ function openCreate() {
   editingId.value = null
   editTab.value = 'info'
   selectedFile.value = null
-  previewUrl.value = ''
+  revokePreviewUrl()
   form.name = ''
   form.quantity = 1
   form.rate = 0
@@ -448,7 +455,7 @@ function openEdit(item) {
   editingId.value = item.product_id
   editTab.value = 'info'
   selectedFile.value = null
-  previewUrl.value = ''
+  revokePreviewUrl()
   currentImageUrl.value = item.product_image
   form.name = item.product_name
   form.quantity = item.quantity
@@ -462,6 +469,11 @@ function openEdit(item) {
 async function submitProductForm() {
   if (!form.name || !form.brandId || !form.categoriesId) {
     ui.warning('Completa todos los campos obligatorios.')
+    return
+  }
+  const unsafe = findUnsafeField({ 'Nombre del producto': form.name })
+  if (unsafe) {
+    ui.error(`El campo "${unsafe}" contiene código o caracteres no permitidos.`)
     return
   }
   saving.value = true
@@ -511,7 +523,7 @@ async function submitPhotoForm() {
       currentImageUrl.value = res.imageUrl
     }
     selectedFile.value = null
-    previewUrl.value = ''
+    revokePreviewUrl()
     ui.success('Imagen actualizada exitosamente.')
   } catch (err) {
     ui.error(extractErrorMessage(err))
@@ -542,5 +554,9 @@ onMounted(() => {
   productsStore.fetchProducts()
   brandsStore.fetchBrands()
   categoriesStore.fetchCategories()
+})
+
+onUnmounted(() => {
+  revokePreviewUrl()
 })
 </script>

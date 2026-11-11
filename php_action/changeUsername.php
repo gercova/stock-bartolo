@@ -4,7 +4,7 @@ require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
 
 $data = get_request_data();
-$username = trim((string)($data['username'] ?? ''));
+$username = sanitize_clean_text($data['username'] ?? '', 'nombre de usuario', 120, true);
 $requestedUserId = (int)($data['user_id'] ?? $_SESSION['userId']);
 $sessionUserId = (int)$_SESSION['userId'];
 
@@ -12,8 +12,8 @@ if ($requestedUserId !== $sessionUserId) {
     send_http_error(403, 'No tienes permisos para modificar el nombre de usuario de otra cuenta.');
 }
 
-if ($username === '') {
-    send_http_error(400, 'El nombre de usuario es obligatorio.');
+if (mb_strlen($username, 'UTF-8') < 3) {
+    send_http_error(400, 'El nombre de usuario debe tener al menos 3 caracteres.');
 }
 
 $checkStmt = $connect->prepare('SELECT user_id FROM users WHERE username = ? AND user_id != ? LIMIT 1');

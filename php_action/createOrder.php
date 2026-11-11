@@ -5,20 +5,18 @@ require_method(['POST']);
 
 $data = get_request_data();
 
-$rawDate = trim((string)($data['orderDate'] ?? ''));
-$clientName = trim((string)($data['clientName'] ?? ''));
-$clientContact = trim((string)($data['clientContact'] ?? ''));
+$orderDate = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
+$clientName = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
+$clientContact = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
 $discount = round((float)($data['discount'] ?? 0), 2);
 $paid = round((float)($data['paid'] ?? 0), 2);
 $paymentType = (int)($data['paymentType'] ?? 0);
 $paymentStatus = (int)($data['paymentStatus'] ?? 0);
 $items = $data['items'] ?? [];
 
-if ($rawDate === '' || $clientName === '' || $clientContact === '' || $paymentType <= 0 || $paymentStatus <= 0 || !is_array($items) || count($items) === 0) {
-    send_http_error(400, 'Completa todos los campos obligatorios y agrega al menos un producto.');
+if ($discount < 0 || $paid < 0 || !in_array($paymentType, [1, 2, 3], true) || !in_array($paymentStatus, [1, 2, 3], true) || !is_array($items) || count($items) === 0) {
+    send_http_error(400, 'Completa todos los campos obligatorios con valores válidos y agrega al menos un producto.');
 }
-
-$orderDate = date('Y-m-d', strtotime($rawDate));
 
 $connect->begin_transaction();
 
@@ -30,6 +28,9 @@ try {
     $updProdStmt = $connect->prepare('UPDATE product SET quantity = ? WHERE product_id = ?');
 
     foreach ($items as $item) {
+        if (!is_array($item)) {
+            throw new InvalidArgumentException('Formato de fila de producto inválido.');
+        }
         $productId = (int)($item['productId'] ?? $item['product_id'] ?? 0);
         $qty = (int)($item['quantity'] ?? 0);
         if ($productId <= 0 || $qty <= 0) {
@@ -42,7 +43,7 @@ try {
         $product = $prodRes ? $prodRes->fetch_assoc() : null;
 
         if (!$product) {
-            throw new RuntimeException('Producto #' . $productId . ' no encontrado.');
+            throw new InvalidArgumentException('Producto #' . $productId . ' no encontrado.');
         }
 
         $currentStock = (int)$product['quantity'];
@@ -125,5 +126,6 @@ try {
 } catch (Throwable $e) {
     $connect->rollback();
     $connect->close();
-    send_http_error(500, 'No se pudo registrar la orden: ' . $e->getMessage());
+    error_log('[stock-bartolo] createOrder error: ' . $e->getMessage());
+    send_http_error(500, 'No se pudo registrar la orden.');
 }

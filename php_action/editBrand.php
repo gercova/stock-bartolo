@@ -5,10 +5,10 @@ require_method(['POST', 'PUT']);
 
 $data = get_request_data();
 $brandId = (int)($data['brandId'] ?? 0);
-$brandName = trim((string)($data['editBrandName'] ?? $data['brandName'] ?? ''));
+$brandName = sanitize_clean_text($data['editBrandName'] ?? $data['brandName'] ?? '', 'nombre del fabricante', 150, true);
 $brandStatus = (int)($data['editBrandStatus'] ?? $data['brandStatus'] ?? 0);
 
-if ($brandId <= 0 || $brandName === '' || !in_array($brandStatus, [1, 2], true)) {
+if ($brandId <= 0 || !in_array($brandStatus, [1, 2], true)) {
     send_http_error(400, 'Datos inválidos para actualizar el fabricante.');
 }
 

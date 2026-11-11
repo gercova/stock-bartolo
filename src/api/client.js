@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useErrorStore } from '@/stores/error'
+import { getCookie } from '@/utils/security'
 
 const apiClient = axios.create({
   baseURL: '/php_action',
@@ -13,6 +14,50 @@ const apiClient = axios.create({
 
 let routerRef = null
 let onUnauthorizedRef = null
+let csrfTokenMem = ''
+let csrfFetchPromise = null
+
+export function setCsrfToken(token) {
+  if (typeof token === 'string' && token.trim() !== '') {
+    csrfTokenMem = token.trim()
+  }
+}
+
+export function clearCsrfToken() {
+  csrfTokenMem = ''
+}
+
+export function getCsrfToken() {
+  return csrfTokenMem || getCookie('XSRF-TOKEN') || ''
+}
+
+export async function ensureCsrfToken() {
+  const existing = getCsrfToken()
+  if (existing) {
+    csrfTokenMem = existing
+    return existing
+  }
+  if (!csrfFetchPromise) {
+    csrfFetchPromise = axios
+      .get('/php_action/csrfToken.php', {
+        withCredentials: true,
+        timeout: 10000,
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+      .then((res) => {
+        const token = res?.data?.csrfToken || getCookie('XSRF-TOKEN') || ''
+        if (token) setCsrfToken(token)
+        return token
+      })
+      .finally(() => {
+        csrfFetchPromise = null
+      })
+  }
+  return csrfFetchPromise
+}
 
 export function setupApiInterceptors(router, onUnauthorized) {
   routerRef = router
@@ -30,10 +75,28 @@ export function extractErrorMessage(err, fallback = 'Ocurrió un error al proces
   return fallback
 }
 
-const REDIRECT_STATUS_CODES = new Set([403, 500, 501, 502, 503, 504])
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
+const REDIRECT_STATUS_CODES = new Set([403, 429, 500, 501, 502, 503, 504])
+
+apiClient.interceptors.request.use(async (config) => {
+  const method = (config.method || 'get').toLowerCase()
+  if (MUTATING_METHODS.has(method)) {
+    const token = await ensureCsrfToken()
+    if (token) {
+      config.headers = config.headers || {}
+      config.headers['X-CSRF-Token'] = token
+    }
+  }
+  return config
+})
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response?.data?.csrfToken) {
+      setCsrfToken(response.data.csrfToken)
+    }
+    return response
+  },
   (error) => {
     const status = error?.response?.status
     const config = error?.config || {}
@@ -53,7 +116,6 @@ apiClient.interceptors.response.use(
     }
 
     if (!error.response) {
-      // Network failure / backend down -> 503 Service Unavailable
       const errorStore = useErrorStore()
       errorStore.setError({
         code: 503,
@@ -78,6 +140,10 @@ apiClient.interceptors.response.use(
         })
       }
       return Promise.reject(error)
+    }
+
+    if (status === 403 && error?.response?.data?.details?.reason === 'csrf_invalid') {
+      clearCsrfToken()
     }
 
     if (REDIRECT_STATUS_CODES.has(status) && !config.skipErrorRedirect) {

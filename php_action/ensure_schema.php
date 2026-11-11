@@ -1,6 +1,6 @@
 <?php
 
-function ensure_loan_schema(mysqli $connect): void
+function ensure_app_schema(mysqli $connect): void
 {
     static $checked = false;
     if ($checked) {
@@ -50,6 +50,25 @@ function ensure_loan_schema(mysqli $connect): void
         KEY `idx_loan_payments_loan` (`loan_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
+    $loginAttemptsTableSql = "CREATE TABLE IF NOT EXISTS `login_attempts` (
+        `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
+        `ip_address` varchar(45) NOT NULL,
+        `username` varchar(150) NOT NULL,
+        `attempts` int(11) NOT NULL DEFAULT 0,
+        `first_attempt_at` datetime NOT NULL,
+        `locked_until` datetime DEFAULT NULL,
+        `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`attempt_id`),
+        UNIQUE KEY `uniq_login_attempt_ip_user` (`ip_address`, `username`),
+        KEY `idx_login_attempts_ip_updated` (`ip_address`, `updated_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
     $connect->query($loansTableSql);
     $connect->query($paymentsTableSql);
+    $connect->query($loginAttemptsTableSql);
+}
+
+function ensure_loan_schema(mysqli $connect): void
+{
+    ensure_app_schema($connect);
 }

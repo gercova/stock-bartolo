@@ -177,6 +177,7 @@ import { Search, Plus, Pencil, Trash2, Loader2 } from '@lucide/vue'
 import { useCategoriesStore } from '@/stores/categories'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
+import { findUnsafeField } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -220,6 +221,11 @@ function openEdit(item) {
 async function submitForm() {
   if (!form.name) {
     ui.warning('El nombre de la categoría es obligatorio.')
+    return
+  }
+  const unsafe = findUnsafeField({ 'Nombre de la categoría': form.name })
+  if (unsafe) {
+    ui.error(`El campo "${unsafe}" contiene código o caracteres no permitidos.`)
     return
   }
   saving.value = true

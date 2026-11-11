@@ -373,6 +373,7 @@ import {
   orderPaymentStatusMeta,
   paymentMethodLabel,
 } from '@/utils/formatters'
+import { escapeHtml } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -451,7 +452,7 @@ function printInvoice() {
   const rows = printData.value.items
     .map(
       (i, idx) =>
-        `<tr><td>${idx + 1}</td><td>${i.product_name}</td><td style="text-align:right">$${Number(i.rate).toFixed(2)}</td><td style="text-align:right">${i.quantity}</td><td style="text-align:right">$${Number(i.total).toFixed(2)}</td></tr>`
+        `<tr><td>${idx + 1}</td><td>${escapeHtml(i.product_name)}</td><td style="text-align:right">$${Number(i.rate).toFixed(2)}</td><td style="text-align:right">${Number(i.quantity)}</td><td style="text-align:right">$${Number(i.total).toFixed(2)}</td></tr>`
     )
     .join('')
   const win = window.open('', '_blank', 'height=650,width=820')
@@ -461,7 +462,7 @@ function printInvoice() {
   }
   win.document.write(`
     <!DOCTYPE html>
-    <html lang="es"><head><meta charset="utf-8"><title>Orden #${o.order_id}</title>
+    <html lang="es"><head><meta charset="utf-8"><title>Orden #${escapeHtml(o.order_id)}</title>
     <style>
       body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a}
       table{width:100%;border-collapse:collapse;margin:16px 0}
@@ -469,8 +470,8 @@ function printInvoice() {
       th{background:#f8fafc;text-align:left}
       .totals{max-width:300px;margin-left:auto}
     </style></head><body>
-    <h2>Comprobante de Orden #${o.order_id}</h2>
-    <p><strong>Fecha:</strong> ${o.order_date} &nbsp;|&nbsp; <strong>Cliente:</strong> ${o.client_name} &nbsp;|&nbsp; <strong>Teléfono:</strong> ${o.client_contact}</p>
+    <h2>Comprobante de Orden #${escapeHtml(o.order_id)}</h2>
+    <p><strong>Fecha:</strong> ${escapeHtml(o.order_date)} &nbsp;|&nbsp; <strong>Cliente:</strong> ${escapeHtml(o.client_name)} &nbsp;|&nbsp; <strong>Teléfono:</strong> ${escapeHtml(o.client_contact)}</p>
     <table><thead><tr><th>#</th><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
     <table class="totals">
       <tr><th>Sub total</th><td style="text-align:right">$${Number(o.sub_total).toFixed(2)}</td></tr>

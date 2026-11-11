@@ -91,11 +91,12 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { UserCog, KeyRound, CheckCircle2, Loader2 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
+import { findUnsafeField } from '@/utils/security'
 
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -116,6 +117,11 @@ const passwordForm = reactive({
 async function submitUsername() {
   if (!usernameForm.username) {
     ui.warning('El nombre de usuario es obligatorio.')
+    return
+  }
+  const unsafe = findUnsafeField({ 'Nombre de usuario': usernameForm.username })
+  if (unsafe) {
+    ui.error(`El campo "${unsafe}" contiene código o caracteres no permitidos.`)
     return
   }
   savingUsername.value = true
@@ -147,6 +153,13 @@ async function submitPassword() {
     savingPassword.value = false
   }
 }
+
+watch(
+  () => auth.user?.username,
+  (val) => {
+    if (val) usernameForm.username = val
+  }
+)
 
 onMounted(() => {
   usernameForm.username = auth.user?.username || ''

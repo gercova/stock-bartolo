@@ -2,34 +2,12 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
-ensure_loan_schema($connect);
+ensure_app_schema($connect);
 
 $data = array_merge($_GET, get_request_data());
-$rawStart = trim((string)($data['startDate'] ?? ''));
-$rawEnd = trim((string)($data['endDate'] ?? ''));
+$startDate = validate_iso_date($data['startDate'] ?? '', 'fecha inicial', true);
+$endDate = validate_iso_date($data['endDate'] ?? '', 'fecha final', true);
 
-if ($rawStart === '' || $rawEnd === '') {
-    send_http_error(400, 'La fecha inicial y la fecha final son requeridas.');
-}
-
-function parse_report_date(string $input): ?string
-{
-    foreach (['Y-m-d', 'm/d/Y', 'd/m/Y'] as $fmt) {
-        $dt = DateTime::createFromFormat($fmt, $input);
-        if ($dt && $dt->format($fmt) === $input) {
-            return $dt->format('Y-m-d');
-        }
-    }
-    $ts = strtotime($input);
-    return $ts !== false ? date('Y-m-d', $ts) : null;
-}
-
-$startDate = parse_report_date($rawStart);
-$endDate = parse_report_date($rawEnd);
-
-if (!$startDate || !$endDate) {
-    send_http_error(400, 'Formato de fecha inválido.');
-}
 if ($startDate > $endDate) {
     send_http_error(400, 'La fecha inicial no puede ser posterior a la fecha final.');
 }

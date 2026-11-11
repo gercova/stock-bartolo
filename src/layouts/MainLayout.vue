@@ -13,7 +13,7 @@
     <aside
       class="no-print fixed inset-y-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-100 transition-all duration-200 ease-out lg:static lg:translate-x-0"
       :class="[
-        ui.mobileMenuOpen ? 'translate-x-0' : '-translate-x-full',
+        ui.mobileMenuOpen ? 'translate-x-0 visible' : '-translate-x-full invisible lg:visible',
         ui.sidebarCollapsed ? 'lg:w-20' : 'lg:w-64',
         'w-72'
       ]"

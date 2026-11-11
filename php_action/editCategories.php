@@ -5,10 +5,10 @@ require_method(['POST', 'PUT']);
 
 $data = get_request_data();
 $categoriesId = (int)($data['editCategoriesId'] ?? $data['categoriesId'] ?? 0);
-$categoriesName = trim((string)($data['editCategoriesName'] ?? $data['categoriesName'] ?? ''));
+$categoriesName = sanitize_clean_text($data['editCategoriesName'] ?? $data['categoriesName'] ?? '', 'nombre de la categoría', 150, true);
 $categoriesStatus = (int)($data['editCategoriesStatus'] ?? $data['categoriesStatus'] ?? 0);
 
-if ($categoriesId <= 0 || $categoriesName === '' || !in_array($categoriesStatus, [1, 2], true)) {
+if ($categoriesId <= 0 || !in_array($categoriesStatus, [1, 2], true)) {
     send_http_error(400, 'Datos inválidos para actualizar la categoría.');
 }
 

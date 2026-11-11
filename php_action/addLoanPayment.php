@@ -2,22 +2,24 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
-ensure_loan_schema($connect);
+ensure_app_schema($connect);
 
 $data = get_request_data();
 
 $userId = (int)$_SESSION['userId'];
 $loanId = (int)($data['loanId'] ?? 0);
 $amount = round((float)($data['amount'] ?? 0), 2);
-$paymentDateRaw = trim((string)($data['paymentDate'] ?? date('Y-m-d')));
+$paymentDate = validate_iso_date($data['paymentDate'] ?? date('Y-m-d'), 'fecha de abono', true);
 $paymentMethod = (int)($data['paymentMethod'] ?? 2);
-$notes = trim((string)($data['notes'] ?? ''));
+$notes = sanitize_clean_text($data['notes'] ?? '', 'nota de abono', 255, false);
 
 if ($loanId <= 0 || $amount <= 0) {
     send_http_error(400, 'El préstamo y un monto de abono mayor a 0 son obligatorios.');
 }
 
-$paymentDate = date('Y-m-d', strtotime($paymentDateRaw));
+if (!in_array($paymentMethod, [1, 2, 3], true)) {
+    send_http_error(400, 'Método de pago inválido.');
+}
 
 $connect->begin_transaction();
 
@@ -75,5 +77,6 @@ try {
 } catch (Throwable $e) {
     $connect->rollback();
     $connect->close();
-    send_http_error(500, 'No se pudo registrar el abono: ' . $e->getMessage());
+    error_log('[stock-bartolo] addLoanPayment error: ' . $e->getMessage());
+    send_http_error(500, 'No se pudo registrar el abono.');
 }

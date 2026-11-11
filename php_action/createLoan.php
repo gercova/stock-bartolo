@@ -2,43 +2,52 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
-ensure_loan_schema($connect);
+ensure_app_schema($connect);
 
 $data = get_request_data();
 
 $userId = (int)$_SESSION['userId'];
-$clientName = trim((string)($data['clientName'] ?? ''));
-$clientContact = trim((string)($data['clientContact'] ?? ''));
-$clientDocument = trim((string)($data['clientDocument'] ?? ''));
+$clientName = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
+$clientContact = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
+$clientDocument = sanitize_clean_text($data['clientDocument'] ?? '', 'documento', 100, false);
 $orderId = !empty($data['orderId']) ? (int)$data['orderId'] : null;
-$loanDateRaw = trim((string)($data['loanDate'] ?? date('Y-m-d')));
-$dueDateRaw = trim((string)($data['dueDate'] ?? ''));
+$loanDate = validate_iso_date($data['loanDate'] ?? date('Y-m-d'), 'fecha de emisión', true);
+$dueDate = validate_iso_date($data['dueDate'] ?? '', 'fecha de vencimiento', false);
 $principal = round((float)($data['principalAmount'] ?? 0), 2);
 $hasInterest = !empty($data['hasInterest']) && $data['hasInterest'] !== '0' && $data['hasInterest'] !== 'false';
 $interestRate = $hasInterest ? round((float)($data['interestRate'] ?? 0), 2) : 0.00;
 $interestMode = ($data['interestMode'] ?? 'flat') === 'monthly' ? 'monthly' : 'flat';
-$termMonths = max(1, (int)($data['termMonths'] ?? 1));
+$termMonths = max(1, min(360, (int)($data['termMonths'] ?? 1)));
 $initialPayment = round((float)($data['initialPayment'] ?? 0), 2);
 $paymentMethod = (int)($data['paymentMethod'] ?? 2);
-$notes = trim((string)($data['notes'] ?? ''));
+$notes = sanitize_clean_text($data['notes'] ?? '', 'notas', 1000, false);
 
-if ($clientName === '' || $clientContact === '' || $principal <= 0) {
-    send_http_error(400, 'El nombre del cliente, teléfono y monto mayor a 0 son obligatorios.');
+if ($principal <= 0) {
+    send_http_error(400, 'El monto del préstamo debe ser mayor a 0.');
 }
 
-if ($hasInterest && $interestRate <= 0) {
-    send_http_error(400, 'Si activas interés para este préstamo, debes indicar una tasa mayor a 0%.');
+if (!in_array($paymentMethod, [1, 2, 3], true)) {
+    send_http_error(400, 'Método de pago inválido.');
 }
 
-if ($interestRate < 0 || $interestRate > 1000) {
-    send_http_error(400, 'La tasa de interés debe estar entre 0% y 1000%.');
+if ($hasInterest && ($interestRate <= 0 || $interestRate > 1000)) {
+    send_http_error(400, 'La tasa de interés debe estar entre 0.01% y 1000%.');
 }
-
-$loanDate = date('Y-m-d', strtotime($loanDateRaw));
-$dueDate = $dueDateRaw !== '' ? date('Y-m-d', strtotime($dueDateRaw)) : null;
 
 if ($dueDate !== null && $dueDate < $loanDate) {
     send_http_error(400, 'La fecha de vencimiento no puede ser anterior a la fecha de emisión.');
+}
+
+if ($orderId !== null) {
+    $ordCheck = $connect->prepare('SELECT order_id FROM orders WHERE order_id = ? AND order_status = 1 LIMIT 1');
+    $ordCheck->bind_param('i', $orderId);
+    $ordCheck->execute();
+    $ordExists = $ordCheck->get_result()->fetch_assoc();
+    $ordCheck->close();
+    if (!$ordExists) {
+        $connect->close();
+        send_http_error(400, 'La orden asociada seleccionada no existe.');
+    }
 }
 
 $interestAmount = 0.00;
@@ -124,5 +133,6 @@ try {
 } catch (Throwable $e) {
     $connect->rollback();
     $connect->close();
-    send_http_error(500, 'No se pudo emitir el préstamo: ' . $e->getMessage());
+    error_log('[stock-bartolo] createLoan error: ' . $e->getMessage());
+    send_http_error(500, 'No se pudo emitir el préstamo.');
 }
