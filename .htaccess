@@ -1,4 +1,5 @@
 Options -Indexes
+DirectoryIndex dist/index.html index.html
 
 ErrorDocument 400 /php_action/error.php?code=400
 ErrorDocument 401 /php_action/error.php?code=401

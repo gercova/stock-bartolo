@@ -293,6 +293,9 @@ Durante la revisión línea por línea de todos los módulos backend y frontend 
 10. **Soporte transparente de contraseñas legadas (`php_action/login.php`, `changePassword.php`)**:
     - *Hallazgo:* La base histórica almacenaba contraseñas en `md5`.
     - *Solución:* Verificación dual segura y actualización automática silenciosa a `password_hash(..., PASSWORD_DEFAULT)` en el primer login exitoso.
+11. **Prevención de error `502 Bad Gateway` en desarrollo y mensajería HTTP clara (`vite.config.js`, `src/api/client.js`, `.htaccess`)**:
+    - *Hallazgo:* Al iniciar únicamente `npm run dev` sin lanzar `php -S 127.0.0.1:8000` en otra consola, el proxy de Vite devolvía `502 Bad Gateway` sin cuerpo JSON en `/php_action/csrfToken.php` y `/php_action/login.php`, mostrando `"Request failed with status code 502"` en el login. Adicionalmente, en Apache sin `mod_rewrite` activo, `/` servía el `index.html` de desarrollo.
+    - *Solución:* Se añadió el plugin `phpDevBackendPlugin()` en [vite.config.js](vite.config.js) para iniciar automáticamente `php -S 127.0.0.1:8000` en `dev`/`preview` cuando `VITE_API_TARGET` no está ocupado, responder JSON `502` descriptivo si el upstream falla, traducir `502/503/HTML` y reintentar una vez tokens CSRF caducados en [client.js](src/api/client.js), y declarar `DirectoryIndex dist/index.html index.html` en [.htaccess](.htaccess).
 
 ### 6.1 Inventario de Archivos `.php` Obsoletos Eliminados
 

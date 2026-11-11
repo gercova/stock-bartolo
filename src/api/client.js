@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useErrorStore } from '@/stores/error'
+import { getHttpErrorInfo } from '@/constants/httpErrors'
 import { getCookie } from '@/utils/security'
 
 const apiClient = axios.create({
@@ -65,13 +66,38 @@ export function setupApiInterceptors(router, onUnauthorized) {
 }
 
 export function extractErrorMessage(err, fallback = 'Ocurrió un error al procesar la solicitud.') {
-  if (err?.response?.data) {
-    const d = err.response.data
-    if (typeof d === 'string' && d.trim()) return d
-    if (d.messages && typeof d.messages === 'string') return d.messages
-    if (d.message && typeof d.message === 'string') return d.message
+  const data = err?.response?.data
+  if (data) {
+    if (typeof data === 'string') {
+      const trimmed = data.trim()
+      if (trimmed && !trimmed.startsWith('<')) {
+        return trimmed
+      }
+    } else if (typeof data === 'object') {
+      if (data.messages && typeof data.messages === 'string') return data.messages
+      if (data.message && typeof data.message === 'string') return data.message
+    }
   }
-  if (err?.message) return err.message
+
+  const status = err?.response?.status
+  if (status === 502) {
+    return 'Error 502 (Bad Gateway): No se recibió respuesta del servidor backend PHP. Verifica que PHP o Apache esté ejecutándose.'
+  }
+  if (status === 503 || (!err?.response && err?.code !== 'ECONNABORTED')) {
+    return 'Error 503 (Servicio no disponible): No se pudo conectar con el servidor de aplicaciones o base de datos.'
+  }
+  if (status) {
+    const info = getHttpErrorInfo(status)
+    return `${info.title} (HTTP ${status}). ${info.hint}`
+  }
+
+  if (err?.code === 'ECONNABORTED') {
+    return 'Tiempo de espera agotado (HTTP 408). Verifica tu conexión e inténtalo de nuevo.'
+  }
+
+  if (err?.message && !/^Request failed with status code \d+$/i.test(err.message)) {
+    return err.message
+  }
   return fallback
 }
 
@@ -97,7 +123,7 @@ apiClient.interceptors.response.use(
     }
     return response
   },
-  (error) => {
+  async (error) => {
     const status = error?.response?.status
     const config = error?.config || {}
     const url = config.url || ''
@@ -144,6 +170,19 @@ apiClient.interceptors.response.use(
 
     if (status === 403 && error?.response?.data?.details?.reason === 'csrf_invalid') {
       clearCsrfToken()
+      if (!config._csrfRetried) {
+        config._csrfRetried = true
+        try {
+          const freshToken = await ensureCsrfToken()
+          if (freshToken) {
+            config.headers = config.headers || {}
+            config.headers['X-CSRF-Token'] = freshToken
+            return apiClient.request(config)
+          }
+        } catch {
+          // Fall through to standard 403 handling
+        }
+      }
     }
 
     if (REDIRECT_STATUS_CODES.has(status) && !config.skipErrorRedirect) {

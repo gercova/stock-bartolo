@@ -182,20 +182,14 @@ chmod -R 775 assests/images/stock
 
 ## Ejecución en Desarrollo y Producción
 
-### Modo Desarrollo (dos terminales)
+### Modo Desarrollo (un solo comando)
 
-1. **Terminal 1 — Backend API PHP**:
-   ```bash
-   npm run serve:api
-   # Ejecuta: php -S 127.0.0.1:8000
-   ```
-2. **Terminal 2 — Servidor de desarrollo Vite**:
-   ```bash
-   npm run dev
-   # Disponible en http://localhost:5173
-   ```
+```bash
+npm run dev
+# Inicia Vite en http://localhost:5173 y levanta automáticamente PHP en 127.0.0.1:8000
+```
 
-Vite reenvía automáticamente las peticiones `/php_action/*` y `/assests/*` hacia `VITE_API_TARGET` (`http://127.0.0.1:8000`), manteniendo cookies de sesión y CSRF en el mismo origen.
+Vite verifica al iniciar si ya existe un servidor escuchando en `VITE_API_TARGET` (`http://127.0.0.1:8000` por defecto). Si no hay ninguno activo, inicia automáticamente `php -S 127.0.0.1:8000` (y lo detiene al cerrar Vite), evitando errores `502 Bad Gateway` en login o peticiones `/php_action/*`. Si deseas usar un servidor PHP o Apache externo, puedes ejecutar `npm run serve:api` manualmente o definir `VITE_API_TARGET`.
 
 ### Compilación y Despliegue en Producción (Apache)
 
@@ -203,10 +197,10 @@ Vite reenvía automáticamente las peticiones `/php_action/*` y `/assests/*` hac
    ```bash
    npm run build
    ```
-2. Puedes previsualizar el bundle compilado contra el backend PHP ejecutando `npm run serve:api` en una terminal y `npm run preview` (`http://localhost:4173`) en otra.
+2. Puedes previsualizar el bundle compilado ejecutando `npm run preview` (`http://localhost:4173`, también con auto-inicio del backend PHP si no hay otro proceso en `8000`).
 3. En un servidor **Apache**:
-   - Apunta el `DocumentRoot` a la raíz del proyecto (el archivo [.htaccess](.htaccess) redirige `/` y rutas SPA hacia `dist/index.html`, sirve `/assets/*` desde `dist/assets/*`, expone `php_action/` e imágenes y bloquea archivos sensibles como `pos_stock.sql` y dotfiles).
-   - Verifica que estén activos los módulos `mod_rewrite` y `mod_headers` y permitido `AllowOverride All`.
+   - Apunta el `DocumentRoot` a la raíz del proyecto (el archivo [.htaccess](.htaccess) define `DirectoryIndex dist/index.html`, redirige `/` y rutas SPA hacia `dist/index.html`, sirve `/assets/*` desde `dist/assets/*`, expone `php_action/` e imágenes y bloquea archivos sensibles como `pos_stock.sql` y dotfiles).
+   - **Importante:** Asegúrate de tener habilitados los módulos `mod_rewrite` y `mod_headers` y permitido `AllowOverride All` (en Ubuntu/Debian: `sudo a2enmod rewrite headers && sudo systemctl restart apache2`); de lo contrario Apache no aplicará las reescrituras de `/assets/*` hacia `dist/assets/*`.
 
 ---
 
