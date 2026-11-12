@@ -12,8 +12,8 @@ export const useClientsStore = defineStore('clients', () => {
     inactive_count: 0,
   })
 
-  const loading = ref(false)
-  const saving = ref(false)
+  const loading   = ref(false)
+  const saving    = ref(false)
   const lookingUp = ref(false)
 
   async function fetchClients(filters = {}) {
@@ -26,8 +26,8 @@ export const useClientsStore = defineStore('clients', () => {
       if (filters.status !== undefined && filters.status !== '' && filters.status !== 'all') params.status = filters.status
       if (filters.branch_id) params.branch_id = filters.branch_id
 
-      const { data } = await apiClient.get('/fetchClients.php', { params })
-      clients.value = data?.data || []
+      const { data }  = await apiClient.get('/fetchClients.php', { params })
+      clients.value   = data?.data || []
       if (data?.stats) {
         stats.value = data.stats
       }

@@ -55,11 +55,11 @@ export const useOperationsStore = defineStore('operations', {
         if (this.filters.client_id) params.append('client_id', this.filters.client_id)
         if (this.filters.search) params.append('search', this.filters.search)
 
-        const res = await apiClient.get(`/fetchOperations.php?${params.toString()}`)
+        const res     = await apiClient.get(`/fetchOperations.php?${params.toString()}`)
         const payload = res.data
         if (payload?.success) {
           this.operations = payload.data || []
-          this.stats = payload.stats || this.stats
+          this.stats      = payload.stats || this.stats
           this.centralCashBalance = payload.central_cash_balance ?? 0
           if (payload.settings) {
             this.settings = { ...this.settings, ...payload.settings }
@@ -76,8 +76,8 @@ export const useOperationsStore = defineStore('operations', {
     async createOperation(payload) {
       this.submitting = true
       try {
-        const res = await apiClient.post('/createOperation.php', payload)
-        const data = res.data
+        const res   = await apiClient.post('/createOperation.php', payload)
+        const data  = res.data
         if (data?.success) {
           await this.fetchOperations()
         }
@@ -135,8 +135,8 @@ export const useOperationsStore = defineStore('operations', {
     async redeemReward(payload) {
       this.submitting = true
       try {
-        const res = await apiClient.post('/redeemReward.php', payload)
-        const data = res.data
+        const res   = await apiClient.post('/redeemReward.php', payload)
+        const data  = res.data
         if (data?.success) {
           await Promise.all([this.fetchRewards(), this.fetchLoyaltyRanking()])
         }

@@ -35,27 +35,27 @@ export function sumDenominations(denomMap) {
 }
 
 export const useCashRegisterStore = defineStore('cashRegister', () => {
-  const activeBranch = ref(null)
-  const systemConfig = ref(null)
-  const generalCash = ref(null)
-  const registers = ref([])
-  const openSessions = ref([])
-  const sessions = ref([])
+  const activeBranch  = ref(null)
+  const systemConfig  = ref(null)
+  const generalCash   = ref(null)
+  const registers     = ref([])
+  const openSessions  = ref([])
+  const sessions      = ref([])
 
   const currentDetail = ref(null)
-  const loading = ref(false)
+  const loading       = ref(false)
   const loadingDetail = ref(false)
 
   async function fetchCashDashboard() {
     loading.value = true
     try {
-      const { data } = await apiClient.get('/fetchCashSessions.php')
-      activeBranch.value = data?.activeBranch || null
-      systemConfig.value = data?.systemConfig || null
-      generalCash.value = data?.generalCash || null
-      registers.value = data?.registers || []
-      openSessions.value = data?.openSessions || []
-      sessions.value = data?.sessions || []
+      const { data }      = await apiClient.get('/fetchCashSessions.php')
+      activeBranch.value  = data?.activeBranch || null
+      systemConfig.value  = data?.systemConfig || null
+      generalCash.value   = data?.generalCash || null
+      registers.value     = data?.registers || []
+      openSessions.value  = data?.openSessions || []
+      sessions.value      = data?.sessions || []
       return data
     } finally {
       loading.value = false
@@ -63,7 +63,7 @@ export const useCashRegisterStore = defineStore('cashRegister', () => {
   }
 
   async function fetchRegisters() {
-    const { data } = await apiClient.get('/fetchCashRegisters.php')
+    const { data }  = await apiClient.get('/fetchCashRegisters.php')
     registers.value = data?.data || []
     return registers.value
   }

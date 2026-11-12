@@ -4,14 +4,14 @@ import apiClient from '@/api/client'
 
 export function calculateLoanPreview({
   principalAmount = 0,
-  hasInterest = false,
-  interestRate = 0,
-  interestMode = 'flat',
-  termMonths = 1,
+  hasInterest     = false,
+  interestRate    = 0,
+  interestMode    = 'flat',
+  termMonths      = 1,
 }) {
   const principal = Math.max(0, Number(principalAmount) || 0)
-  const rate = hasInterest ? Math.max(0, Number(interestRate) || 0) : 0
-  const term = Math.max(1, parseInt(termMonths, 10) || 1)
+  const rate      = hasInterest ? Math.max(0, Number(interestRate) || 0) : 0
+  const term      = Math.max(1, parseInt(termMonths, 10) || 1)
 
   let interestAmount = 0
   if (hasInterest && principal > 0 && rate > 0) {
@@ -22,8 +22,8 @@ export function calculateLoanPreview({
     }
   }
 
-  interestAmount = Math.round(interestAmount * 100) / 100
-  const totalAmount = Math.round((principal + interestAmount) * 100) / 100
+  interestAmount          = Math.round(interestAmount * 100) / 100
+  const totalAmount       = Math.round((principal + interestAmount) * 100) / 100
   const installmentAmount = Math.round((totalAmount / term) * 100) / 100
 
   return {

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import apiClient from '@/api/client'
 
 export const useProductsStore = defineStore('products', () => {
-  const items = ref([])
+  const items   = ref([])
   const loading = ref(false)
 
   async function fetchProducts() {

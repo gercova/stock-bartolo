@@ -3,7 +3,12 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
-sb_assert_permission($connect, 'clients', 'create');
+$userId = (int)($_SESSION['userId'] ?? 0);
+if (!sb_has_permission($connect, $userId, 'clients', 'create') &&
+    !sb_has_permission($connect, $userId, 'orders', 'create') &&
+    !sb_has_permission($connect, $userId, 'operations', 'create')) {
+    send_http_error(403, 'No tienes permisos para registrar clientes.');
+}
 
 $data = get_request_data();
 $docType = strtoupper(trim((string)($data['document_type'] ?? 'DNI')));

@@ -3,11 +3,11 @@ import { ref } from 'vue'
 import apiClient from '@/api/client'
 
 export const useOrdersStore = defineStore('orders', () => {
-  const items = ref([])
+  const items             = ref([])
   const availableProducts = ref([])
-  const currentOrder = ref(null)
-  const currentItems = ref([])
-  const loading = ref(false)
+  const currentOrder      = ref(null)
+  const currentItems      = ref([])
+  const loading         = ref(false)
 
   async function fetchOrders() {
     loading.value = true

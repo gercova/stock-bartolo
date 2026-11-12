@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import apiClient from '@/api/client'
 
 export const useSecurityStore = defineStore('security', () => {
-  const users = ref([])
+  const users     = ref([])
   const userStats = ref({
     total: 0,
     active: 0,
@@ -11,12 +11,12 @@ export const useSecurityStore = defineStore('security', () => {
     superadmins: 0,
   })
 
-  const roles = ref([])
-  const availableModules = ref([])
+  const roles             = ref([])
+  const availableModules  = ref([])
 
-  const auditLogs = ref([])
-  const auditTotal = ref(0)
-  const auditStats = ref({
+  const auditLogs   = ref([])
+  const auditTotal  = ref(0)
+  const auditStats  = ref({
     total_all: 0,
     today_logs: 0,
     today_users: 0,
@@ -27,7 +27,7 @@ export const useSecurityStore = defineStore('security', () => {
   const loadingUsers = ref(false)
   const loadingRoles = ref(false)
   const loadingAudit = ref(false)
-  const saving = ref(false)
+  const saving       = ref(false)
 
   async function fetchUsers(filters = {}) {
     loadingUsers.value = true

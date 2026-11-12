@@ -6,7 +6,7 @@
       tabindex="0"
       class="flex items-center justify-between gap-2 w-full rounded-lg border border-sky-400 bg-white px-3 py-1.5 text-sm text-slate-900 cursor-pointer hover:border-sky-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-400/30 transition shadow-2xs"
       :class="{ 'opacity-60 cursor-not-allowed bg-slate-50': disabled }"
-      @click="toggleDropdown"
+      @click.stop="toggleDropdown"
       @keydown.down.prevent="openDropdown"
       @keydown.enter.prevent="openDropdown"
       @keydown.space.prevent="openDropdown"
@@ -283,6 +283,7 @@ function navigateUp() {
 }
 
 function handleOutsideClick(event) {
+  if (!dropdownOpen.value) return
   if (rootRef.value && !rootRef.value.contains(event.target)) {
     closeDropdown()
   }

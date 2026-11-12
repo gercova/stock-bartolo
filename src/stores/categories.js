@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import apiClient from '@/api/client'
 
 export const useCategoriesStore = defineStore('categories', () => {
-  const items = ref([])
+  const items   = ref([])
   const loading = ref(false)
 
   async function fetchCategories(onlyActive = false) {
