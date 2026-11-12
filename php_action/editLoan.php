@@ -2,8 +2,8 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
-ensure_app_schema($connect);
 
+$branchId = get_active_branch_id($connect);
 $data = get_request_data();
 
 $loanId = (int)($data['loanId'] ?? 0);
@@ -33,26 +33,26 @@ if ($dueDate !== null && $dueDate < $loanDate) {
 }
 
 if ($orderId !== null) {
-    $ordCheck = $connect->prepare('SELECT order_id FROM orders WHERE order_id = ? AND order_status = 1 LIMIT 1');
-    $ordCheck->bind_param('i', $orderId);
+    $ordCheck = $connect->prepare('SELECT order_id FROM orders WHERE order_id = ? AND branch_id = ? AND order_status = 1 LIMIT 1');
+    $ordCheck->bind_param('ii', $orderId, $branchId);
     $ordCheck->execute();
     $ordExists = $ordCheck->get_result()->fetch_assoc();
     $ordCheck->close();
     if (!$ordExists) {
         $connect->close();
-        send_http_error(400, 'La orden asociada seleccionada no existe.');
+        send_http_error(400, 'La orden asociada seleccionada no pertenece a la sucursal activa.');
     }
 }
 
-$currStmt = $connect->prepare('SELECT paid_amount FROM loans WHERE loan_id = ? AND record_status = 1 LIMIT 1');
-$currStmt->bind_param('i', $loanId);
+$currStmt = $connect->prepare('SELECT paid_amount FROM loans WHERE loan_id = ? AND branch_id = ? AND record_status = 1 LIMIT 1');
+$currStmt->bind_param('ii', $loanId, $branchId);
 $currStmt->execute();
 $currRow = $currStmt->get_result()->fetch_assoc();
 $currStmt->close();
 
 if (!$currRow) {
     $connect->close();
-    send_http_error(404, 'Préstamo no encontrado.');
+    send_http_error(404, 'Préstamo no encontrado en la sucursal activa.');
 }
 
 $paidAmount = round((float)$currRow['paid_amount'], 2);
@@ -82,9 +82,9 @@ if ($balanceDue <= 0) {
 
 $hasInterestInt = $hasInterest ? 1 : 0;
 
-$stmt = $connect->prepare('UPDATE loans SET client_name = ?, client_contact = ?, client_document = ?, order_id = ?, loan_date = ?, due_date = ?, principal_amount = ?, has_interest = ?, interest_rate = ?, interest_mode = ?, term_months = ?, interest_amount = ?, total_amount = ?, balance_due = ?, loan_status = ?, notes = ? WHERE loan_id = ? AND record_status = 1');
+$stmt = $connect->prepare('UPDATE loans SET client_name = ?, client_contact = ?, client_document = ?, order_id = ?, loan_date = ?, due_date = ?, principal_amount = ?, has_interest = ?, interest_rate = ?, interest_mode = ?, term_months = ?, interest_amount = ?, total_amount = ?, balance_due = ?, loan_status = ?, notes = ? WHERE loan_id = ? AND branch_id = ? AND record_status = 1');
 $stmt->bind_param(
-    'sssissdidsidddisi',
+    'sssissdidsidddisii',
     $clientName,
     $clientContact,
     $clientDocument,
@@ -101,7 +101,8 @@ $stmt->bind_param(
     $balanceDue,
     $loanStatus,
     $notes,
-    $loanId
+    $loanId,
+    $branchId
 );
 
 if (!$stmt->execute()) {

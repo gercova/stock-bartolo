@@ -26,6 +26,9 @@ enforce_session_timeout(7200);
 
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/ensure_schema.php';
+require_once __DIR__ . '/tenant.php';
+
+ensure_app_schema($connect);
 
 if (!defined('SKIP_AUTH_CHECK')) {
     if (empty($_SESSION['userId'])) {

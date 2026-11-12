@@ -44,7 +44,6 @@
         </div>
       </form>
     </div>
-
     <!-- Results -->
     <template v-if="hasGenerated">
       <!-- Summary KPIs -->
@@ -166,13 +165,13 @@ import { extractErrorMessage } from '@/api/client'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 
 const store = useReportsStore()
-const ui = useUiStore()
+const ui    = useUiStore()
 const { orders, loans, summary, loanSummary, range, loading, hasGenerated } = storeToRefs(store)
 
-const today = new Date()
-const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+const today     = new Date()
+const firstDay  = new Date(today.getFullYear(), today.getMonth(), 1)
 const startDate = ref(firstDay.toISOString().slice(0, 10))
-const endDate = ref(today.toISOString().slice(0, 10))
+const endDate   = ref(today.toISOString().slice(0, 10))
 
 async function generateReport() {
   if (!startDate.value || !endDate.value) {

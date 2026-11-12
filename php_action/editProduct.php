@@ -3,6 +3,7 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
 
+$branchId = get_active_branch_id($connect);
 $data = get_request_data();
 
 $productId = (int)($data['productId'] ?? 0);
@@ -17,11 +18,41 @@ if ($productId <= 0 || !is_numeric($rawQuantity) || !is_numeric($rawRate) || (in
     send_http_error(400, 'Datos inválidos para actualizar el producto.');
 }
 
+$pCheck = $connect->prepare('SELECT product_id FROM product WHERE product_id = ? AND branch_id = ? AND status = 1 LIMIT 1');
+$pCheck->bind_param('ii', $productId, $branchId);
+$pCheck->execute();
+$prodOk = $pCheck->get_result()->fetch_assoc();
+$pCheck->close();
+if (!$prodOk) {
+    $connect->close();
+    send_http_error(404, 'Producto no encontrado en la sucursal activa.');
+}
+
+$bStmt = $connect->prepare('SELECT brand_id FROM brands WHERE brand_id = ? AND branch_id = ? AND brand_status = 1 LIMIT 1');
+$bStmt->bind_param('ii', $brandId, $branchId);
+$bStmt->execute();
+$brandOk = $bStmt->get_result()->fetch_assoc();
+$bStmt->close();
+if (!$brandOk) {
+    $connect->close();
+    send_http_error(400, 'El fabricante seleccionado no pertenece a la sucursal activa.');
+}
+
+$cStmt = $connect->prepare('SELECT categories_id FROM categories WHERE categories_id = ? AND branch_id = ? AND categories_status = 1 LIMIT 1');
+$cStmt->bind_param('ii', $categoryId, $branchId);
+$cStmt->execute();
+$catOk = $cStmt->get_result()->fetch_assoc();
+$cStmt->close();
+if (!$catOk) {
+    $connect->close();
+    send_http_error(400, 'La categoría seleccionada no pertenece a la sucursal activa.');
+}
+
 $quantity = (string)(int)$rawQuantity;
 $rate = number_format(round((float)$rawRate, 2), 2, '.', '');
 
-$stmt = $connect->prepare('UPDATE product SET product_name = ?, brand_id = ?, categories_id = ?, quantity = ?, rate = ?, active = ?, status = 1 WHERE product_id = ?');
-$stmt->bind_param('siissii', $productName, $brandId, $categoryId, $quantity, $rate, $productStatus, $productId);
+$stmt = $connect->prepare('UPDATE product SET product_name = ?, brand_id = ?, categories_id = ?, quantity = ?, rate = ?, active = ?, status = 1 WHERE product_id = ? AND branch_id = ?');
+$stmt->bind_param('siissiii', $productName, $brandId, $categoryId, $quantity, $rate, $productStatus, $productId, $branchId);
 
 if (!$stmt->execute()) {
     $stmt->close();

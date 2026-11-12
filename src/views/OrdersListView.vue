@@ -267,7 +267,10 @@
       <div v-if="printData" class="space-y-5 text-sm">
         <div class="flex flex-col sm:flex-row justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
-            <p class="text-xs uppercase font-semibold text-slate-400">Stock Bartolo</p>
+            <p class="text-xs uppercase font-semibold text-slate-400">
+              {{ auth.systemConfig?.company_name || 'Stock Bartolo' }}
+              <span v-if="printData.branch"> · {{ printData.branch.branch_name }}</span>
+            </p>
             <h4 class="text-lg font-bold text-slate-900">Orden #{{ printData.order.order_id }}</h4>
             <p class="text-slate-600">Fecha: {{ formatDate(printData.order.order_date) }}</p>
           </div>
@@ -307,7 +310,7 @@
             <p class="font-bold text-slate-900 text-sm">{{ formatCurrency(printData.order.sub_total) }}</p>
           </div>
           <div>
-            <p class="text-slate-500">IVA (13%)</p>
+            <p class="text-slate-500">IVA ({{ Number(printData.branch?.tax_rate ?? auth.activeBranch?.tax_rate ?? 13) }}%)</p>
             <p class="font-bold text-slate-900 text-sm">{{ formatCurrency(printData.order.vat) }}</p>
           </div>
           <div>
@@ -364,6 +367,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { Search, Plus, Pencil, CreditCard, Printer, Trash2, Loader2 } from '@lucide/vue'
+import { useAuthStore } from '@/stores/auth'
 import { useOrdersStore } from '@/stores/orders'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
@@ -378,6 +382,7 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 
+const auth = useAuthStore()
 const store = useOrdersStore()
 const ui = useUiStore()
 const { items, loading } = storeToRefs(store)
@@ -449,10 +454,15 @@ async function openPrintModal(orderId) {
 function printInvoice() {
   if (!printData.value) return
   const o = printData.value.order
+  const b = printData.value.branch || auth.activeBranch
+  const sym = escapeHtml(b?.currency_symbol || '$')
+  const taxPct = Number(b?.tax_rate ?? 13)
+  const companyName = escapeHtml(auth.systemConfig?.company_name || 'Stock Bartolo')
+  const footerText = escapeHtml(auth.systemConfig?.receipt_footer || '')
   const rows = printData.value.items
     .map(
       (i, idx) =>
-        `<tr><td>${idx + 1}</td><td>${escapeHtml(i.product_name)}</td><td style="text-align:right">$${Number(i.rate).toFixed(2)}</td><td style="text-align:right">${Number(i.quantity)}</td><td style="text-align:right">$${Number(i.total).toFixed(2)}</td></tr>`
+        `<tr><td>${idx + 1}</td><td>${escapeHtml(i.product_name)}</td><td style="text-align:right">${sym}${Number(i.rate).toFixed(2)}</td><td style="text-align:right">${Number(i.quantity)}</td><td style="text-align:right">${sym}${Number(i.total).toFixed(2)}</td></tr>`
     )
     .join('')
   const win = window.open('', '_blank', 'height=650,width=820')
@@ -469,18 +479,22 @@ function printInvoice() {
       th,td{border:1px solid #cbd5e1;padding:8px;font-size:13px}
       th{background:#f8fafc;text-align:left}
       .totals{max-width:300px;margin-left:auto}
+      .footer{margin-top:24px;font-size:12px;color:#475569;text-align:center}
     </style></head><body>
-    <h2>Comprobante de Orden #${escapeHtml(o.order_id)}</h2>
+    <p style="margin:0;font-size:12px;color:#475569;text-transform:uppercase">${companyName}${b ? ` — ${escapeHtml(b.branch_name)} (${escapeHtml(b.branch_code)})` : ''}</p>
+    <h2 style="margin-top:4px">Comprobante de Orden #${escapeHtml(o.order_id)}</h2>
     <p><strong>Fecha:</strong> ${escapeHtml(o.order_date)} &nbsp;|&nbsp; <strong>Cliente:</strong> ${escapeHtml(o.client_name)} &nbsp;|&nbsp; <strong>Teléfono:</strong> ${escapeHtml(o.client_contact)}</p>
     <table><thead><tr><th>#</th><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
     <table class="totals">
-      <tr><th>Sub total</th><td style="text-align:right">$${Number(o.sub_total).toFixed(2)}</td></tr>
-      <tr><th>IVA (13%)</th><td style="text-align:right">$${Number(o.vat).toFixed(2)}</td></tr>
-      <tr><th>Descuento</th><td style="text-align:right">$${Number(o.discount).toFixed(2)}</td></tr>
-      <tr><th>Total</th><td style="text-align:right"><strong>$${Number(o.grand_total).toFixed(2)}</strong></td></tr>
-      <tr><th>Pagado</th><td style="text-align:right">$${Number(o.paid).toFixed(2)}</td></tr>
-      <tr><th>Pendiente</th><td style="text-align:right">$${Number(o.due).toFixed(2)}</td></tr>
-    </table></body></html>
+      <tr><th>Sub total</th><td style="text-align:right">${sym}${Number(o.sub_total).toFixed(2)}</td></tr>
+      <tr><th>IVA (${taxPct}%)</th><td style="text-align:right">${sym}${Number(o.vat).toFixed(2)}</td></tr>
+      <tr><th>Descuento</th><td style="text-align:right">${sym}${Number(o.discount).toFixed(2)}</td></tr>
+      <tr><th>Total</th><td style="text-align:right"><strong>${sym}${Number(o.grand_total).toFixed(2)}</strong></td></tr>
+      <tr><th>Pagado</th><td style="text-align:right">${sym}${Number(o.paid).toFixed(2)}</td></tr>
+      <tr><th>Pendiente</th><td style="text-align:right">${sym}${Number(o.due).toFixed(2)}</td></tr>
+    </table>
+    ${footerText ? `<p class="footer">${footerText}</p>` : ''}
+    </body></html>
   `)
   win.document.close()
   win.focus()

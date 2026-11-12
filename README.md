@@ -1,6 +1,6 @@
-# Stock Bartolo — Sistema de Gestión de Inventario, Ventas y Préstamos
+# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja y Préstamos
 
-Aplicación web moderna de **página única (SPA)** para la administración integral de inventario, punto de venta (órdenes), reportes y **gestión de préstamos a clientes con interés opcional**. Migrada desde una arquitectura PHP tradicional hacia **Vue 3 + Pinia + Vue Router + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** y base de datos **MySQL / MariaDB** con endurecimiento de seguridad contra XSS, CSRF, fuerza bruta e inyección SQL.
+Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, reportes y **gestión de préstamos a clientes con interés opcional**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** (`65` endpoints/módulos) y base de datos **MySQL / MariaDB** (`17` tablas) con endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
 
 ---
 
@@ -21,40 +21,52 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
 
 ## Características Principales
 
-### 1. Diseño Responsivo e Interfaz Moderna (`MainLayout`)
+### 1. Arquitectura Multi-Sucursal (Multi-Tenant) e Interface Responsiva (`MainLayout`)
 - Layout adaptable *mobile-first* implementado en [MainLayout.vue](src/layouts/MainLayout.vue) y estado global en [ui.js](src/stores/ui.js).
-- Barra lateral colapsable en escritorio (`lg:w-64` ↔ `lg:w-20`) y cajón lateral deslizable (*drawer*) con fondo difuminado en móviles y tabletas.
-- Vistas optimizadas con doble presentación: tablas interactivas en pantallas grandes y tarjetas resumidas en dispositivos móviles.
+- **Selector rápido de sucursal activa** en la barra superior (`switchBranch.php`) con cambio en vivo y remonte reactivo de rutas por sucursal (`branch_id`).
+- Aislamiento estricto por `branch_id` en inventario (`brands`, `categories`, `product`), ventas (`orders`), préstamos (`loans`, `loan_payments`), bóveda de `Caja General` (`general_cash_accounts`, `general_cash_movements`), turnos de `Caja` (`cash_registers`, `cash_sessions`, `cash_movements`, `cash_reconciliations`) y tablero KPI (`fetchDashboard.php`).
+- Cada sucursal mantiene parámetros independientes de tasa fiscal (`tax_rate`), moneda (`currency_code`, `currency_symbol`), datos de contacto y capital operativo.
+- Barra lateral colapsable en escritorio (`lg:w-64` ↔ `lg:w-20`), cajón lateral deslizable (*drawer*) accesible en móviles (`invisible lg:visible`) y doble presentación tabla/tarjetas.
 
-### 2. Nuevo Módulo de Préstamos (`/loans`)
-- Permite a usuarios autenticados (`$_SESSION['userId']`) emitir préstamos registrados bajo su usuario emisor (`issued_by`) con generación automática de código único (`PREST-0001`, `PREST-0002`, etc.).
+### 2. Configuración del Sistema y Caja General Multi-Sucursal (`/system-config`)
+- Módulo centralizado de 3 pestañas en [SystemConfigView.vue](src/views/SystemConfigView.vue) y [systemConfig.js](src/stores/systemConfig.js):
+  1. **Caja General Independiente por Sucursal**:
+     - Panel selector de bóvedas que muestra saldo disponible, alertas de liquidez mínima y número de cajas abiertas por sucursal.
+     - CRUD completo sobre la cuenta (`general_cash_accounts`) y su libro mayor (`general_cash_movements`): **capital inicial / aportes**, **retiros**, **ajustes positivos/negativos**, edición de concepto/referencia de movimientos manuales, anulación con recálculo atómico de saldo y configuración de saldo mínimo de alerta / estado.
+     - Registro automático e inmutable de salidas por **fondeo de apertura de caja** (`till_open_allocation`) y entradas por **entrega al cerrar turno** (`till_close_return`) o **retiros parciales desde gaveta**.
+  2. **Sucursales (CRUD Multi-Tenant)**:
+     - Creación, edición, conmutación activa y borrado lógico protegido (impide eliminar la sucursal principal o sucursales con cajas abiertas).
+     - Al crear una sucursal, el backend provisiona atómicamente su **Caja General independiente** (con capital inicial opcional) y su caja registradora inicial (`CAJA-01`).
+  3. **Parámetros y Políticas Operativas**:
+     - Identidad corporativa, pie de comprobante, valores predeterminados fiscales/monetarios y reglas operativas: exigir turno de caja abierto para cobros en efectivo (`enforce_open_till_for_cash`), fondeo automático en apertura, entrega sugerida al cerrar caja y visibilidad del conmutador multi-sucursal.
+
+### 3. Módulo de Caja / Turno de Caja (`/cash-register`)
+- Ciclo operativo completo en [CashRegisterView.vue](src/views/CashRegisterView.vue) y [cashRegister.js](src/stores/cashRegister.js):
+  - **CRUD de Cajas Registradoras** (`cash_registers`): gestión de múltiples terminales (`CAJA-01`, `CAJA-02`, etc.) por sucursal.
+  - **Apertura de Caja ([OpenCashModal.vue](src/components/cash/OpenCashModal.vue))**: asigna fondo inicial con deducción atómica opcional desde la `Caja General` de la sucursal activa (`FOR UPDATE`). Impide doble apertura simultánea de la misma caja.
+  - **Operación en Vivo y Movimientos**:
+    - Descuento/abono automático del efectivo esperado en gaveta al emitir o abonar **órdenes en efectivo**, al **desembolsar préstamos en efectivo** (`loan_disbursement`) o cobrar **cuotas de préstamo en efectivo** (`loan_payment_cash`), además de seguimiento informativo de cobros con tarjeta/transferencia/cheque.
+    - Movimientos manuales en [CashMovementModal.vue](src/components/cash/CashMovementModal.vue): ingresos manuales, gastos menores, retiros manuales y traspasos parciales a Caja General (`sweep_to_general`).
+  - **Arqueo de Caja ([ReconcileCashModal.vue](src/components/cash/ReconcileCashModal.vue))**:
+    - Contador interactivo de **12 denominaciones** (billetes y monedas USD desde `$100` hasta `$0.01`), ingreso de montos declarados en tarjeta/transferencia/cheque, cálculo en tiempo real de sobrante/faltante/cuadre exacto e historial persistente en `cash_reconciliations`.
+  - **Cierre de Caja / Corte Z ([CloseCashModal.vue](src/components/cash/CloseCashModal.vue)) y Detalle / Corte X ([CashSessionDetailModal.vue](src/components/cash/CashSessionDetailModal.vue))**:
+    - Cierre transaccional con arqueo final, transferencia configurable de efectivo hacia la `Caja General` de la sucursal (con cálculo automático de fondo retenido en gaveta) y **reporte imprimible Corte X / Corte Z** sanitizado contra XSS.
+
+### 4. Módulo de Préstamos (`/loans`)
+- Permite a usuarios autenticados (`$_SESSION['userId']`) emitir préstamos dentro de la sucursal activa con código único (`PREST-0001`, `PREST-0002`, etc.).
 - **Interés opcional configurable por préstamo** mediante interruptor dedicado (`hasInterest`):
   - **Sin interés (`0%`)**: El cliente paga exactamente el capital prestado.
-  - **Con interés**: Permite especificar tasa porcentual (`interestRate`), modalidad de cálculo (**porcentaje único** `flat` sobre capital o **mensual simple** `monthly` = tasa × plazo) y plazo en meses/cuotas (`termMonths`), mostrando un **resumen financiero en tiempo real** antes de guardar.
-- Funcionalidades completas:
-  - Asociación opcional a una orden de venta existente (`order_id`).
-  - Abono inicial opcional al momento de emitir el préstamo.
-  - Registro transaccional de abonos parciales o liquidación total (`loan_payments`) en [LoanPaymentModal.vue](src/components/loans/LoanPaymentModal.vue).
-  - Vista de detalle con historial de pagos, barra de progreso y **comprobante imprimible** en [LoanDetailModal.vue](src/components/loans/LoanDetailModal.vue).
-  - Tarjetas KPI (capital prestado, intereses generados, saldo por recuperar, préstamos activos/vencidos/liquidados) y detección automática de mora por fecha de vencimiento (`loan_status = 4`).
+  - **Con interés**: Permite especificar tasa porcentual (`interestRate`), modalidad (**porcentaje único** `flat` o **mensual simple** `monthly`) y plazo en meses/cuotas (`termMonths`) con resumen financiero en vivo.
+- Asociación opcional a una orden activa de la misma sucursal, abono inicial opcional, historial de pagos (`loan_payments`), integración automática con `Caja`, comprobante imprimible en [LoanDetailModal.vue](src/components/loans/LoanDetailModal.vue) y detección automática de mora (`loan_status = 4`).
 
-### 3. Gestión de Inventario, Órdenes y Reportes
-- **Fabricantes (`/brands`)** y **Categorías (`/categories`)**: CRUD completo con búsqueda instantánea, filtros por disponibilidad y borrado lógico (`brand_status = 2`, `categories_status = 2`).
-- **Productos (`/products`)**: CRUD completo con vista de imagen, validación segura de carga de archivos, edición independiente de fotografía (`editProductImage.php`), alertas de stock bajo (`<= 3` unidades) y filtro por estado.
-- **Órdenes / POS (`/orders`, `/orders/create`, `/orders/:id/edit`)**:
-  - Agregado dinámico de múltiples ítems con precios tomados desde base de datos.
-  - Cálculo automático de Subtotal, IVA (`13%`), Descuento, Total y Saldo Pendiente.
-  - Descuento y reposición **atómica/transaccional** del inventario (`BEGIN TRANSACTION` + `FOR UPDATE`) al crear, editar o anular una orden.
-  - Edición rápida de abonos (`editPayment.php`) y comprobante imprimible sanitizado contra XSS.
-- **Reportes (`/reports`)**: Consolidado imprimible por rango de fechas que cruza órdenes y préstamos emitidos con totales recaudados y saldos pendientes.
+### 5. Gestión de Inventario, Órdenes y Reportes
+- **Fabricantes (`/brands`)** y **Categorías (`/categories`)**: CRUD por sucursal con búsqueda, filtros y borrado lógico.
+- **Productos (`/products`)**: CRUD por sucursal con carga segura de imágenes (`editProductImage.php`) y alertas de stock bajo (`<= 3` unidades).
+- **Órdenes / POS (`/orders`, `/orders/create`, `/orders/:id/edit`)**: cálculo con tasa de IVA y símbolo de moneda de la sucursal activa, control transaccional de stock (`FOR UPDATE`), verificación de caja abierta cuando `enforce_open_till_for_cash` está activo y ticket imprimible con cabecera de sucursal.
+- **Reportes (`/reports`)**: Consolidado imprimible por rango de fechas dentro de la sucursal activa cruzando órdenes y préstamos.
 
-### 4. Páginas de Error HTTP (`400`–`504`)
-- Manejador centralizado en SPA ([ErrorView.vue](src/views/ErrorView.vue), [httpErrors.js](src/constants/httpErrors.js), [router/index.js](src/router/index.js), [client.js](src/api/client.js)) y backend/Apache ([http_error.php](php_action/http_error.php), [error.php](php_action/error.php), [.htaccess](.htaccess)).
-- Cobertura dedicada para: **`400`**, **`401`**, **`403`**, **`404`**, **`405`**, **`408`**, **`422`**, **`429`**, **`500`**, **`501`**, **`502`**, **`503`**, **`504`**.
-
-### 5. Arquitectura SPA y Limpieza de Vistas `.php`
-- Migración completa a rutas del lado cliente con `createWebHistory()` en Vue Router.
-- Se eliminaron todas las vistas e includes `.php` legadas (`index.php`, `dashboard.php`, `brand.php`, `categories.php`, `product.php`, `orders.php`, `report.php`, `setting.php`, `logout.php`, `includes/*` y `modal/*`), conservando únicamente los endpoints API en `php_action/` y las imágenes en `assests/images/`.
+### 6. Páginas de Error HTTP (`400`–`504`) y SPA Pura
+- Manejador centralizado en SPA ([ErrorView.vue](src/views/ErrorView.vue), [httpErrors.js](src/constants/httpErrors.js)) y Apache ([http_error.php](php_action/http_error.php), [error.php](php_action/error.php), [.htaccess](.htaccess)) cubriendo **`400`, `401`, `403`, `404`, `405`, `408`, `422`, `429`, `500`, `501`, `502`, `503`, `504`**.
 
 ---
 
@@ -66,12 +78,12 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
 | **Estado Global** | Pinia | `^4.1.0` |
 | **Enrutamiento SPA** | Vue Router | `^5.5.0` |
 | **Estilos UI** | Tailwind CSS + `@tailwindcss/vite` | `^4.3.5` |
-| **Cliente HTTP** | Axios (con interceptores CSRF y HTTP Errors) | `^1.21.1` |
+| **Cliente HTTP** | Axios (CSRF + manejo HTTP Errors) | `^1.21.1` |
 | **Iconografía** | `@lucide/vue` | `^1.0.0` |
 | **Bundler** | Vite + `@vitejs/plugin-vue` | `^8.3.7` / `^6.0.10` |
 | **Backend API** | PHP (API JSON + Sesiones + `mysqli`) | PHP 8.1+ (probado en 8.3) |
-| **Base de Datos** | MySQL / MariaDB (`utf8mb4` en tablas nuevas) | 5.7+ / MariaDB 10.4+ |
-| **Servidor Web** | Apache (`mod_rewrite`, `mod_headers`) o servidor embebido PHP | `.htaccess` incluido |
+| **Base de Datos** | MySQL / MariaDB (`utf8mb4` en tablas nuevas/tenant) | 5.7+ / MariaDB 10.4+ (probado en 10.11.14) |
+| **Servidor Web** | Apache (`mod_rewrite`, `mod_headers`) o PHP embebido | `.htaccess` incluido |
 
 ---
 
@@ -79,50 +91,54 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
 
 ```text
 stock-bartolo/
-├── index.html                   # Punto de entrada HTML de la SPA (con favicon SVG integrado)
+├── index.html                   # Entrada HTML SPA (con favicon SVG integrado)
 ├── package.json                 # Scripts y dependencias NPM
-├── vite.config.js               # Configuración Vite, alias '@' y proxy hacia php_action y assests
-├── .htaccess                    # Reescritura SPA, cabeceras de seguridad, CSP y ErrorDocument
-├── pos_stock.sql                # Esquema completo MySQL (9 tablas + datos iniciales)
+├── vite.config.js               # Alias '@', proxy /php_action y auto-inicio PHP en dev/preview
+├── .htaccess                    # Reescritura SPA, CSP, cabeceras de seguridad y ErrorDocument
+├── pos_stock.sql                # Esquema completo MySQL/MariaDB (17 tablas + datos iniciales)
 ├── README.md                    # Documentación general del proyecto
 ├── PDR.md                       # Documento de Diseño Preliminar, Auditoría y Seguridad
 ├── assests/
 │   └── images/
-│       ├── .htaccess            # Bloqueo de listado y ejecución PHP/CGI en carpeta de subidas
+│       ├── .htaccess            # Bloqueo de listado y ejecución PHP/CGI en subidas
 │       ├── photo_default.png    # Imagen por defecto de productos
-│       └── stock/               # Imágenes subidas de productos
-├── php_action/                  # Backend API JSON en PHP 8
-│   ├── core.php                 # Bootstrap de sesión, auth, CSRF, cabeceras y helpers JSON
-│   ├── security.php             # CSP, sanitización XSS/código malicioso, CSRF, rate limit, uploads
-│   ├── http_error.php           # Respuestas estandarizadas JSON/HTML para errores HTTP 400-504
+│       └── stock/               # Imágenes de productos
+├── php_action/                  # Backend API JSON (65 archivos PHP)
+│   ├── core.php                 # Sesión, auth, contexto multi-sucursal, CSRF y JSON helpers
+│   ├── tenant.php               # Helpers multi-tenant, bóveda Caja General y saldo vivo de Caja
+│   ├── security.php             # CSP, sanitización XSS/SQLi/código malicioso, CSRF, rate limit, uploads
+│   ├── http_error.php           # Respuestas estandarizadas JSON/HTML (400-504)
 │   ├── error.php                # Controlador ErrorDocument para Apache
 │   ├── db_connect.php           # Conexión MySQLi vía variables de entorno o defaults locales
-│   ├── ensure_schema.php        # Creación idempotente de tablas loans, loan_payments y login_attempts
+│   ├── ensure_schema.php        # Migración idempotente de las 17 tablas y seeds multi-sucursal
 │   ├── csrfToken.php            # Emisor público GET de token/cookie CSRF
 │   ├── login.php / logout.php / checkAuth.php
 │   ├── changeUsername.php / changePassword.php
 │   ├── fetchDashboard.php / getOrderReport.php
-│   ├── createBrand.php / fetchBrand.php / fetchSelectedBrand.php / editBrand.php / removeBrand.php
-│   ├── createCategories.php / fetchCategories.php / fetchSelectedCategories.php / editCategories.php / removeCategories.php
-│   ├── createProduct.php / fetchProduct.php / fetchProductData.php / fetchSelectedProduct.php / fetchProductImageUrl.php / editProduct.php / editProductImage.php / removeProduct.php
-│   ├── createOrder.php / fetchOrder.php / fetchOrderData.php / editOrder.php / editPayment.php / removeOrder.php / printOrder.php
-│   └── createLoan.php / fetchLoan.php / fetchLoanData.php / editLoan.php / addLoanPayment.php / removeLoan.php
+│   ├── fetchBranches.php / createBranch.php / editBranch.php / removeBranch.php / switchBranch.php
+│   ├── fetchSystemConfig.php / saveSystemConfig.php
+│   ├── fetchGeneralCash.php / manageGeneralCash.php
+│   ├── fetchCashRegisters.php / createCashRegister.php / editCashRegister.php / removeCashRegister.php
+│   ├── fetchCashSessions.php / fetchCashSessionDetail.php / openCashSession.php / addCashMovement.php / reconcileCashSession.php / closeCashSession.php
+│   ├── *Brand.php (5) / *Categories.php (5) / *Product*.php (8) / *Order*.php / editPayment.php (7) / *Loan*.php (6)
 └── src/
     ├── main.js                  # Inicialización Vue, Pinia, Router e interceptores Axios
     ├── App.vue                  # Raíz con RouterView y ToastContainer
     ├── style.css                # Tailwind CSS v4 + estilos de impresión
-    ├── api/client.js            # Instancia Axios con auto-inyección CSRF y redirección de errores HTTP
+    ├── api/client.js            # Axios con CSRF automático, recarga en 401/403 y mapeo de errores HTTP
     ├── constants/httpErrors.js  # Catálogo descriptivo de errores HTTP 400-504
-    ├── layouts/MainLayout.vue   # Shell responsivo (sidebar + drawer móvil + navbar + breadcrumbs)
-    ├── router/index.js          # Rutas protegidas, alias de errores HTTP y catch-all 404
-    ├── stores/                  # 10 stores Pinia (auth, ui, error, dashboard, brands, categories, products, orders, loans, reports)
+    ├── layouts/MainLayout.vue   # Shell responsivo multi-sucursal (sidebar + switcher + drawer móvil)
+    ├── router/index.js          # Rutas protegidas SPA, alias de errores HTTP y catch-all 404
+    ├── stores/                  # 12 stores Pinia (auth, ui, error, dashboard, brands, categories, products, orders, loans, reports, systemConfig, cashRegister)
     ├── utils/
-    │   ├── formatters.js        # Formateo de moneda, fechas y fechas ISO locales
+    │   ├── formatters.js        # Moneda dinámica por sucursal, fechas y badges de movimientos/arqueos
     │   └── security.js          # escapeHtml(), detección de patrones peligrosos y lectura de cookies
     ├── components/
     │   ├── common/              # BaseModal, ConfirmModal, StatusBadge, ToastContainer
-    │   └── loans/               # LoanFormModal, LoanPaymentModal, LoanDetailModal
-    └── views/                   # 11 vistas SPA (Login, Dashboard, Brands, Categories, Products, OrdersList, OrderForm, Loans, Reports, Settings, ErrorView)
+    │   ├── loans/               # LoanFormModal, LoanPaymentModal, LoanDetailModal
+    │   ├── system/              # BranchFormModal, GeneralCashMovementModal, GeneralCashConfigModal
+    │   └── cash/                # CashRegisterModal, OpenCashModal, CashMovementModal, ReconcileCashModal, CloseCashModal, CashSessionDetailModal
+    └── views/                   # 13 vistas SPA (Login, Dashboard, Brands, Categories, Products, OrdersList, OrderForm, CashRegister, Loans, Reports, SystemConfig, Settings, ErrorView)
 ```
 
 ---
@@ -130,11 +146,7 @@ stock-bartolo/
 ## Requisitos Previos
 
 - **Node.js** `>= 20.x` y **npm** `>= 10.x`
-- **PHP** `>= 8.1` con extensiones habilitadas:
-  - `mysqli`
-  - `fileinfo`
-  - `mbstring`
-  - `json`
+- **PHP** `>= 8.1` con extensiones habilitadas: `mysqli`, `fileinfo`, `mbstring`, `json`
 - **MySQL** `>= 5.7` o **MariaDB** `>= 10.4`
 
 ---
@@ -149,13 +161,13 @@ npm install
 
 ### 2. Importar la base de datos
 
-Importa [pos_stock.sql](pos_stock.sql) en tu servidor MySQL/MariaDB (crea la base `pos_stock` con todas las tablas, incluyendo `loans`, `loan_payments` y `login_attempts`):
+Importa [pos_stock.sql](pos_stock.sql) en tu servidor MySQL/MariaDB (crea la base `pos_stock` con las `17` tablas, índices multi-tenant y datos iniciales de `SUC-001`, `CAJA-01` y `general_cash_accounts`):
 
 ```bash
 mysql -u root -p < pos_stock.sql
 ```
 
-> **Nota:** Adicionalmente, [ensure_schema.php](php_action/ensure_schema.php) crea de forma automática e idempotente las tablas `loans`, `loan_payments` y `login_attempts` si actualizas sobre una instalación previa que solo contaba con las tablas originales.
+> **Nota:** Adicionalmente, [ensure_schema.php](php_action/ensure_schema.php) crea y migra de forma automática e idempotente todas las columnas `branch_id` y nuevas tablas (`branches`, `system_settings`, `general_cash_accounts`, `general_cash_movements`, `cash_registers`, `cash_sessions`, `cash_movements`, `cash_reconciliations`, `loans`, `loan_payments`, `login_attempts`) si actualizas una base de datos previa.
 
 ### 3. Configurar conexión a base de datos
 
@@ -172,8 +184,6 @@ mysql -u root -p < pos_stock.sql
 
 ### 4. Permisos para subida de imágenes
 
-Asegúrate de que el usuario del servidor web/PHP tenga permisos de lectura y escritura sobre `assests/images/stock/`:
-
 ```bash
 chmod -R 775 assests/images/stock
 ```
@@ -189,18 +199,16 @@ npm run dev
 # Inicia Vite en http://localhost:5173 y levanta automáticamente PHP en 127.0.0.1:8000
 ```
 
-Vite verifica al iniciar si ya existe un servidor escuchando en `VITE_API_TARGET` (`http://127.0.0.1:8000` por defecto). Si no hay ninguno activo, inicia automáticamente `php -S 127.0.0.1:8000` (y lo detiene al cerrar Vite), evitando errores `502 Bad Gateway` en login o peticiones `/php_action/*`. Si deseas usar un servidor PHP o Apache externo, puedes ejecutar `npm run serve:api` manualmente o definir `VITE_API_TARGET`.
+Vite verifica al iniciar si ya existe un servidor escuchando en `VITE_API_TARGET` (`http://127.0.0.1:8000` por defecto). Si no hay ninguno activo, inicia automáticamente `php -S 127.0.0.1:8000` (y lo detiene al cerrar Vite), evitando errores `502 Bad Gateway` en login o peticiones `/php_action/*`.
 
 ### Compilación y Despliegue en Producción (Apache)
 
-1. Genera los artefactos optimizados en `dist/`:
+1. Genera el bundle optimizado en `dist/`:
    ```bash
    npm run build
    ```
-2. Puedes previsualizar el bundle compilado ejecutando `npm run preview` (`http://localhost:4173`, también con auto-inicio del backend PHP si no hay otro proceso en `8000`).
-3. En un servidor **Apache**:
-   - Apunta el `DocumentRoot` a la raíz del proyecto (el archivo [.htaccess](.htaccess) define `DirectoryIndex dist/index.html`, redirige `/` y rutas SPA hacia `dist/index.html`, sirve `/assets/*` desde `dist/assets/*`, expone `php_action/` e imágenes y bloquea archivos sensibles como `pos_stock.sql` y dotfiles).
-   - **Importante:** Asegúrate de tener habilitados los módulos `mod_rewrite` y `mod_headers` y permitido `AllowOverride All` (en Ubuntu/Debian: `sudo a2enmod rewrite headers && sudo systemctl restart apache2`); de lo contrario Apache no aplicará las reescrituras de `/assets/*` hacia `dist/assets/*`.
+2. Previsualiza localmente el build si lo deseas con `npm run preview` (`http://localhost:4173`).
+3. En **Apache**, apunta el `DocumentRoot` a la raíz del proyecto, habilita `mod_rewrite` + `mod_headers` y `AllowOverride All`. El archivo [.htaccess](.htaccess) sirve `dist/index.html`, reescribe rutas SPA y protege archivos internos.
 
 ---
 
@@ -208,91 +216,77 @@ Vite verifica al iniciar si ya existe un servidor escuchando en `VITE_API_TARGET
 
 | Ruta | Vista | Acceso | Descripción |
 | :--- | :--- | :--- | :--- |
-| `/login` | `LoginView.vue` | Invitados (`guestOnly`) | Inicio de sesión con protección CSRF y bloqueo por intentos fallidos |
-| `/dashboard` | `DashboardView.vue` | Autenticado | KPIs generales de inventario, ventas y resumen de préstamos |
-| `/brands` | `BrandsView.vue` | Autenticado | Gestión de fabricantes |
-| `/categories` | `CategoriesView.vue` | Autenticado | Gestión de categorías |
-| `/products` | `ProductsView.vue` | Autenticado | Catálogo de productos e imágenes |
-| `/orders` | `OrdersListView.vue` | Autenticado | Listado, pagos, impresión y eliminación de órdenes |
-| `/orders/create` | `OrderFormView.vue` | Autenticado | Creación de orden multi-producto con cálculo de IVA y descuento |
-| `/orders/:id/edit` | `OrderFormView.vue` | Autenticado | Edición de orden existente con ajuste de stock |
-| `/loans` | `LoansView.vue` | Autenticado | Emisión de préstamos (con/sin interés), abonos e historial |
-| `/reports` | `ReportsView.vue` | Autenticado | Reportes imprimibles por rango de fechas (órdenes y préstamos) |
-| `/settings` | `SettingsView.vue` | Autenticado | Cambio de nombre de usuario y contraseña |
-| `/error/:code` | `ErrorView.vue` | Pública | Página dinámica para códigos HTTP (`400`, `403`, `404`, `500`, `501`, `503`, etc.) |
-| `/:code` (alias `400..504`) | `ErrorView.vue` | Pública | Accesos directos (`/404`, `/500`, `/403`, `/503`, etc.) |
-| `/:pathMatch(.*)*` | `ErrorView.vue` | Pública | Captura de rutas inexistentes (renderiza HTTP 404) |
+| `/login` | `LoginView.vue` | Invitados (`guestOnly`) | Inicio de sesión con CSRF y bloqueo por intentos fallidos |
+| `/dashboard` | `DashboardView.vue` | Autenticado | KPIs de la sucursal activa, estado de `Caja General` y `Caja Registradora` |
+| `/brands` | `BrandsView.vue` | Autenticado | Fabricantes de la sucursal activa |
+| `/categories` | `CategoriesView.vue` | Autenticado | Categorías de la sucursal activa |
+| `/products` | `ProductsView.vue` | Autenticado | Catálogo de productos e imágenes de la sucursal activa |
+| `/orders` | `OrdersListView.vue` | Autenticado | Órdenes, abonos, comprobante de sucursal y anulación |
+| `/orders/create` | `OrderFormView.vue` | Autenticado | Nueva orden con IVA y símbolo de moneda de la sucursal |
+| `/orders/:id/edit` | `OrderFormView.vue` | Autenticado | Edición de orden existente con ajuste transaccional de stock |
+| `/cash-register` | `CashRegisterView.vue` | Autenticado | Cajas registradoras, apertura, movimientos, arqueo (12 denoms) y cierre Corte Z |
+| `/loans` | `LoansView.vue` | Autenticado | Emisión de préstamos (con/sin interés), abonos e impacto en caja |
+| `/reports` | `ReportsView.vue` | Autenticado | Reportes imprimibles de órdenes y préstamos por sucursal |
+| `/system-config` | `SystemConfigView.vue` | Autenticado | **Caja General multi-sucursal (CRUD), Sucursales (CRUD) y Políticas del Sistema** |
+| `/settings` | `SettingsView.vue` | Autenticado | Cuenta de usuario, cambio de contraseña y acceso rápido a Configuración del Sistema |
+| `/error/:code` y `/:code` | `ErrorView.vue` | Pública | Páginas de error HTTP (`400`, `403`, `404`, `500`, `501`, `503`, etc.) |
+| `/:pathMatch(.*)*` | `ErrorView.vue` | Pública | Captura de rutas inexistentes (HTTP 404) |
 
 ---
 
 ## Referencia de Endpoints API
 
-Todas las rutas mutantes (`POST`, `PUT`, `DELETE`) exigen sesión autenticada (salvo `login.php` y `logout.php`) y cabecera `X-CSRF-Token` válida:
+Todas las rutas mutantes (`POST`, `PUT`, `DELETE`) exigen sesión autenticada (salvo `login.php` y `logout.php`) y cabecera `X-CSRF-Token` válida. Todos los módulos operativos filtran estrictamente por la sucursal activa (`$_SESSION['active_branch_id']`):
 
 | Módulo | Endpoint | Método | Función principal |
 | :--- | :--- | :--- | :--- |
-| **Seguridad / Auth** | `/php_action/csrfToken.php` | `GET` | Inicializa sesión y emite cookie `XSRF-TOKEN` + JSON `csrfToken` |
-| | `/php_action/checkAuth.php` | `GET` | Consulta estado de sesión actual y sincroniza token CSRF |
-| | `/php_action/login.php` | `POST` | Autentica usuario, aplica rate limiting (`429`) y rota CSRF |
-| | `/php_action/logout.php` | `POST` | Destruye sesión, expira cookies de sesión y `XSRF-TOKEN` |
-| **Dashboard** | `/php_action/fetchDashboard.php` | `GET` | Métricas agregadas de productos, órdenes, stock bajo y préstamos |
-| **Fabricantes** | `/php_action/fetchBrand.php` | `GET` | Lista fabricantes activos |
-| | `/php_action/fetchSelectedBrand.php` | `GET`/`POST` | Obtiene detalle de un fabricante por `brandId` |
-| | `/php_action/createBrand.php` | `POST` | Crea nuevo fabricante |
-| | `/php_action/editBrand.php` | `POST`/`PUT` | Actualiza fabricante |
-| | `/php_action/removeBrand.php` | `POST`/`DELETE` | Desactiva fabricante (`brand_status = 2`) |
-| **Categorías** | `/php_action/fetchCategories.php` | `GET` | Lista categorías activas |
-| | `/php_action/fetchSelectedCategories.php` | `GET`/`POST` | Obtiene detalle de una categoría |
-| | `/php_action/createCategories.php` | `POST` | Crea categoría |
-| | `/php_action/editCategories.php` | `POST`/`PUT` | Edita categoría |
-| | `/php_action/removeCategories.php` | `POST`/`DELETE` | Desactiva categoría (`categories_status = 2`) |
-| **Productos** | `/php_action/fetchProduct.php` | `GET` | Lista catálogo completo con fabricante y categoría |
-| | `/php_action/fetchProductData.php` | `GET` | Lista productos para selects en órdenes (`?all=1` incluye sin stock) |
-| | `/php_action/fetchSelectedProduct.php` | `GET`/`POST` | Obtiene un producto por `productId` |
-| | `/php_action/fetchProductImageUrl.php` | `GET`/`POST` | Devuelve ruta normalizada de imagen de producto |
-| | `/php_action/createProduct.php` | `POST` | Crea producto con imagen validada (`multipart/form-data`) |
-| | `/php_action/editProduct.php` | `POST`/`PUT` | Actualiza datos, precio, stock y estado de producto |
-| | `/php_action/editProductImage.php` | `POST` | Reemplaza la fotografía de producto |
-| | `/php_action/removeProduct.php` | `POST`/`DELETE` | Elimina lógicamente producto (`status = 2`) |
-| **Órdenes** | `/php_action/fetchOrder.php` | `GET` | Lista órdenes activas con conteo de ítems |
-| | `/php_action/fetchOrderData.php` | `GET`/`POST` | Obtiene orden y sus `order_item` |
-| | `/php_action/printOrder.php` | `GET`/`POST` | Obtiene datos completos para comprobante |
-| | `/php_action/createOrder.php` | `POST` | Crea orden transaccional descontando inventario |
-| | `/php_action/editOrder.php` | `POST`/`PUT` | Actualiza orden reponiendo y re-descontando stock |
-| | `/php_action/editPayment.php` | `POST`/`PUT` | Actualiza monto pagado, tipo y estado de pago |
-| | `/php_action/removeOrder.php` | `POST`/`DELETE` | Anula orden (`order_status = 2`) y restaura stock |
-| **Préstamos** | `/php_action/fetchLoan.php` | `GET` | Lista préstamos activos y resumen KPI de cartera |
-| | `/php_action/fetchLoanData.php` | `GET`/`POST` | Detalle de un préstamo e historial de abonos (`loan_payments`) |
-| | `/php_action/createLoan.php` | `POST` | Emite préstamo (con o sin interés) y abono inicial opcional |
-| | `/php_action/editLoan.php` | `POST`/`PUT` | Modifica condiciones/tasa/monto recalculando saldo pendiente |
-| | `/php_action/addLoanPayment.php` | `POST` | Registra abono transaccional y liquida al llegar saldo a `0` |
-| | `/php_action/removeLoan.php` | `POST`/`DELETE` | Borra lógicamente préstamo (`record_status = 2`) |
-| **Reportes y Config.** | `/php_action/getOrderReport.php` | `GET`/`POST` | Reporte filtrado por rango de fechas (`startDate`, `endDate`) |
-| | `/php_action/changeUsername.php` | `POST`/`PUT` | Cambia el nombre de usuario de la cuenta activa |
-| | `/php_action/changePassword.php` | `POST`/`PUT` | Cambia contraseña (`password_hash`) y rota sesión/CSRF |
-| **Errores HTTP** | `/php_action/error.php` | `GET` | Renderiza respuesta JSON o HTML según cabecera `Accept` y código `?code=` |
+| **Auth / Sesión** | `/php_action/csrfToken.php` | `GET` | Emite sesión, cookie `XSRF-TOKEN` y `csrfToken` |
+| | `/php_action/checkAuth.php` | `GET` | Devuelve usuario, `csrfToken`, `activeBranch`, `branches` y `systemConfig` |
+| | `/php_action/login.php` | `POST` | Autentica, inicializa sucursal activa, aplica rate limiting (`429`) y rota CSRF |
+| | `/php_action/logout.php` | `POST` | Destruye sesión y cookies |
+| **Dashboard / Config.** | `/php_action/fetchDashboard.php` | `GET` | KPIs multi-sucursal + saldos en vivo de `Caja General` y turno abierto |
+| | `/php_action/fetchSystemConfig.php` | `GET` | Devuelve parámetros globales, sucursal activa y estadísticas |
+| | `/php_action/saveSystemConfig.php` | `POST`/`PUT` | Actualiza identidad corporativa, defaults fiscales y políticas de caja |
+| **Sucursales** | `/php_action/fetchBranches.php` | `GET` | Lista sucursales con saldos de Caja General, cajas abiertas y conteos |
+| | `/php_action/createBranch.php` | `POST` | Crea sucursal + Caja General independiente + `CAJA-01` transaccionalmente |
+| | `/php_action/editBranch.php` | `POST`/`PUT` | Actualiza datos, IVA, moneda y estado de sucursal |
+| | `/php_action/removeBranch.php` | `POST`/`DELETE` | Elimina lógicamente sucursal secundaria sin cajas abiertas |
+| | `/php_action/switchBranch.php` | `POST` | Cambia `active_branch_id` de la sesión (`role === 'superadmin'` o sucursal asignada) |
+| **Caja General** | `/php_action/fetchGeneralCash.php` | `GET` | Lista todas las bóvedas multi-sucursal + detalle/libro mayor de `?branchId=` |
+| | `/php_action/manageGeneralCash.php` | `POST`/`PUT`/`DELETE` | CRUD de movimientos (`deposit`, `withdrawal`, `initial_capital`, `adjustment_in/out`), edición, anulación y configuración de bóveda |
+| **Caja Registradora** | `/php_action/fetchCashRegisters.php` | `GET` | Lista terminales `cash_registers` de la sucursal activa |
+| | `/php_action/createCashRegister.php` | `POST` | Crea terminal en la sucursal activa |
+| | `/php_action/editCashRegister.php` | `POST`/`PUT` | Edita código/nombre/ubicación/estado de terminal |
+| | `/php_action/removeCashRegister.php` | `POST`/`DELETE` | Desactiva terminal si no posee turno abierto |
+| | `/php_action/fetchCashSessions.php` | `GET` | Lista turnos de caja de la sucursal activa + cajas + saldo disponible de Caja General |
+| | `/php_action/fetchCashSessionDetail.php` | `GET` | Detalle completo de turno (`Corte X/Z`): movimientos y arqueos |
+| | `/php_action/openCashSession.php` | `POST` | Abre turno con fondeo atómico opcional desde Caja General |
+| | `/php_action/addCashMovement.php` | `POST` | Registra ingreso, gasto, retiro manual o traslado parcial hacia Caja General |
+| | `/php_action/reconcileCashSession.php` | `POST` | Registra arqueo (con conteo por denominaciones) y actualiza discrepancia |
+| | `/php_action/closeCashSession.php` | `POST` | Ejecuta cierre `Corte Z`, arqueo final y retorno opcional hacia Caja General |
+| **Fabricantes** | `/php_action/*Brand*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchBrand`, `fetchSelectedBrand`, `createBrand`, `editBrand`, `removeBrand` (por sucursal) |
+| **Categorías** | `/php_action/*Categories*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchCategories`, `fetchSelectedCategories`, `createCategories`, `editCategories`, `removeCategories` (por sucursal) |
+| **Productos** | `/php_action/*Product*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchProduct`, `fetchProductData`, `fetchSelectedProduct`, `fetchProductImageUrl`, `createProduct`, `editProduct`, `editProductImage`, `removeProduct` (por sucursal) |
+| **Órdenes / POS** | `/php_action/*Order*.php`, `editPayment.php`, `printOrder.php` | `GET`/`POST`/`PUT`/`DELETE` | Gestión transaccional de ventas, stock e impacto automático en Caja abierta |
+| **Préstamos** | `/php_action/*Loan*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchLoan`, `fetchLoanData`, `createLoan`, `editLoan`, `addLoanPayment`, `removeLoan` + impacto en Caja abierta |
+| **Reportes / Cuenta** | `getOrderReport.php`, `changeUsername.php`, `changePassword.php`, `error.php` | `GET`/`POST`/`PUT` | Reportes multi-sucursal, gestión de credenciales y respuestas HTTP |
 
 ---
 
 ## Medidas de Seguridad Implementadas
 
-Un desglose detallado de amenazas y controles se encuentra en [PDR.md](PDR.md). En resumen, el sistema implementa:
-
-- **Protección XSS (Cross-Site Scripting)**: Escape declarativo en plantillas Vue, utilitario `escapeHtml()` en ventanas de impresión (`window.open`), limpieza `strip_tags()` en backend, bloqueo de patrones peligrosos y Content Security Policy (`CSP`).
-- **Protección CSRF (Cross-Site Request Forgery)**: Patrón Synchronizer Token + Cookie `XSRF-TOKEN` (`SameSite=Lax`) verificado con `hash_equals()` en todas las peticiones mutantes y rotado tras login y cambio de contraseña.
-- **Rate Limiting en Login (Fuerza Bruta)**: Registro persistente en tabla `login_attempts`; tras **5 intentos fallidos** por cuenta/IP (o 15 por IP en 15 minutos), bloquea el acceso devolviendo **HTTP 429** con cabecera `Retry-After`.
-- **Bloqueo de Inserción de Código Malicioso**: Filtro recursivo tanto en cliente ([security.js](src/utils/security.js)) como en servidor (`inspect_request_payload()` en [security.php](php_action/security.php)) contra etiquetas `<script>`, `<?php`, `<iframe>`/`<svg on*=...>`, URI `javascript:`/`vbscript:`/`data:text/html`, event handlers inline, bytes nulos y patrones `UNION SELECT`, `INTO OUTFILE` y `SLEEP()`.
-- **Prevención de SQL Injection**: Todas las consultas con entrada externa utilizan sentencias preparadas (`mysqli::prepare` + `bind_param`).
-- **Endurecimiento de Subidas y Sesiones**: Validación MIME real con `finfo`, comprobación dimensional `getimagesize()`, nombres aleatorios `bin2hex(random_bytes(16))`, desactivación de ejecución PHP en `assests/images/.htaccess`, cookies `HttpOnly`, timeout de inactividad (`7200` s) y actualización automática de hashes MD5 heredados hacia `password_hash(PASSWORD_DEFAULT)`.
+Un desglose detallado se encuentra en [PDR.md](PDR.md). En resumen:
+- **Aislamiento Multi-Tenant (`tenant.php`)**: Todas las lecturas y mutaciones aplican filtrado estricto `branch_id = $_SESSION['active_branch_id']`; los accesos cruzados entre sucursales responden `404` / `403`.
+- **Integridad Transaccional Financiera**: Todas las mutaciones de saldo en `Caja General`, apertura/arqueo/cierre de `Caja`, descuento de inventario y abonos emplean `begin_transaction()` + bloqueo de fila `SELECT ... FOR UPDATE`.
+- **Protección XSS, CSRF, SQLi, Brute-Force y Carga Maliciosa**: Sanitización en [security.js](src/utils/security.js) y [security.php](php_action/security.php), `X-CSRF-Token` verificado con `hash_equals()`, rate limiting en `login_attempts` (`429`), 100% sentencias preparadas y validación MIME real con `finfo` + `getimagesize()`.
 
 ---
 
 ## Credenciales Iniciales
 
-Tras importar [pos_stock.sql](pos_stock.sql), la cuenta administrativa por defecto es:
+Tras importar [pos_stock.sql](pos_stock.sql), la cuenta administrativa (`role = 'superadmin'`, acceso a todas las sucursales) por defecto es:
 
 - **Usuario:** `admin`
 - **Contraseña:** `admin`
 
-> **Recomendación:** Cambia la contraseña desde **Configuración (`/settings`)** inmediatamente después del primer inicio de sesión. En el primer ingreso válido, el sistema actualiza automáticamente el hash heredado en base de datos hacia `bcrypt` / `PASSWORD_DEFAULT`.
-
+> **Recomendación:** Cambia la contraseña desde **Cuenta y Seguridad (`/settings`)** inmediatamente después del primer inicio de sesión.

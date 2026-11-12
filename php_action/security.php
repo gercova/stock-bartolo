@@ -47,7 +47,15 @@ function enforce_session_timeout(int $maxIdleSeconds = 7200): void
     $now = time();
     if (!empty($_SESSION['userId']) && isset($_SESSION['last_activity'])) {
         if (($now - (int)$_SESSION['last_activity']) > $maxIdleSeconds) {
-            unset($_SESSION['userId'], $_SESSION['username'], $_SESSION['csrf_token'], $_SESSION['last_activity']);
+            unset(
+                $_SESSION['userId'],
+                $_SESSION['username'],
+                $_SESSION['user_role'],
+                $_SESSION['assigned_branch_id'],
+                $_SESSION['active_branch_id'],
+                $_SESSION['csrf_token'],
+                $_SESSION['last_activity']
+            );
             session_regenerate_id(true);
             return;
         }

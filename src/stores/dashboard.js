@@ -4,6 +4,7 @@ import apiClient from '@/api/client'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   const stats = ref({
+    branch: null,
     totalProducts: 0,
     totalOrders: 0,
     lowStockCount: 0,
@@ -11,6 +12,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     totalOrderDue: 0,
     lowStockProducts: [],
     recentOrders: [],
+    generalCash: null,
+    activeTillSession: null,
     loans: {
       totalLoans: 0,
       activeLoans: 0,

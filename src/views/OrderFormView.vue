@@ -156,7 +156,7 @@
             <span class="font-semibold text-slate-900">{{ formatCurrency(subTotal) }}</span>
           </div>
           <div class="flex items-center justify-between text-sm">
-            <span class="text-slate-600">IVA (13%)</span>
+            <span class="text-slate-600">IVA ({{ taxRate }}%)</span>
             <span class="font-semibold text-slate-900">{{ formatCurrency(vat) }}</span>
           </div>
           <div class="flex items-center justify-between text-sm">
@@ -164,7 +164,7 @@
             <span class="font-semibold text-slate-900">{{ formatCurrency(totalAmount) }}</span>
           </div>
           <div class="flex items-center justify-between gap-4 text-sm pt-1">
-            <label for="discount" class="text-slate-600">Descuento ($)</label>
+            <label for="discount" class="text-slate-600">Descuento ({{ currencySymbol }})</label>
             <input
               id="discount"
               v-model.number="form.discount"
@@ -185,7 +185,7 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1.5">Monto pagado ($) *</label>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">Monto pagado ({{ currencySymbol }}) *</label>
               <input
                 v-model.number="form.paid"
                 type="number"
@@ -263,6 +263,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Plus, Trash2, Loader2, CheckCircle2 } from '@lucide/vue'
+import { useAuthStore } from '@/stores/auth'
 import { useOrdersStore } from '@/stores/orders'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
@@ -271,8 +272,12 @@ import { findUnsafeField } from '@/utils/security'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const store = useOrdersStore()
 const ui = useUiStore()
+
+const taxRate = computed(() => Number(auth.activeBranch?.tax_rate ?? 13))
+const currencySymbol = computed(() => auth.activeBranch?.currency_symbol || '$')
 
 const orderId = computed(() => (route.params.id ? Number(route.params.id) : null))
 const isEdit = computed(() => Boolean(orderId.value))
@@ -299,7 +304,7 @@ const subTotal = computed(() =>
   ) / 100
 )
 
-const vat = computed(() => Math.round(subTotal.value * 0.13 * 100) / 100)
+const vat = computed(() => Math.round(subTotal.value * (taxRate.value / 100) * 100) / 100)
 const totalAmount = computed(() => Math.round((subTotal.value + vat.value) * 100) / 100)
 const grandTotal = computed(() =>
   Math.round(Math.max(0, totalAmount.value - (Number(form.discount) || 0)) * 100) / 100

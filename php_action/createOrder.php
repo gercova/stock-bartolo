@@ -3,6 +3,9 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
+$branchId = get_active_branch_id($connect);
+$activeBranch = get_active_branch($connect);
+$userId = (int)$_SESSION['userId'];
 $data = get_request_data();
 
 $orderDate = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
@@ -18,14 +21,16 @@ if ($discount < 0 || $paid < 0 || !in_array($paymentType, [1, 2, 3], true) || !i
     send_http_error(400, 'Completa todos los campos obligatorios con valores válidos y agrega al menos un producto.');
 }
 
+$taxRatePercent = (float)($activeBranch['tax_rate'] ?? 13.0);
+
 $connect->begin_transaction();
 
 try {
     $subTotal = 0.0;
     $resolvedItems = [];
 
-    $prodStmt = $connect->prepare('SELECT product_id, product_name, quantity, rate FROM product WHERE product_id = ? AND status = 1 FOR UPDATE');
-    $updProdStmt = $connect->prepare('UPDATE product SET quantity = ? WHERE product_id = ?');
+    $prodStmt = $connect->prepare('SELECT product_id, product_name, quantity, rate FROM product WHERE product_id = ? AND branch_id = ? AND status = 1 FOR UPDATE');
+    $updProdStmt = $connect->prepare('UPDATE product SET quantity = ? WHERE product_id = ? AND branch_id = ?');
 
     foreach ($items as $item) {
         if (!is_array($item)) {
@@ -37,13 +42,13 @@ try {
             throw new InvalidArgumentException('Cada fila debe tener un producto y cantidad mayor a 0.');
         }
 
-        $prodStmt->bind_param('i', $productId);
+        $prodStmt->bind_param('ii', $productId, $branchId);
         $prodStmt->execute();
         $prodRes = $prodStmt->get_result();
         $product = $prodRes ? $prodRes->fetch_assoc() : null;
 
         if (!$product) {
-            throw new InvalidArgumentException('Producto #' . $productId . ' no encontrado.');
+            throw new InvalidArgumentException('Producto #' . $productId . ' no encontrado en la sucursal activa.');
         }
 
         $currentStock = (int)$product['quantity'];
@@ -56,7 +61,7 @@ try {
         $subTotal += $lineTotal;
 
         $newStock = (string)($currentStock - $qty);
-        $updProdStmt->bind_param('si', $newStock, $productId);
+        $updProdStmt->bind_param('sii', $newStock, $productId, $branchId);
         $updProdStmt->execute();
 
         $resolvedItems[] = [
@@ -71,7 +76,7 @@ try {
     $updProdStmt->close();
 
     $subTotal = round($subTotal, 2);
-    $vat = round($subTotal * 0.13, 2);
+    $vat = round($subTotal * ($taxRatePercent / 100), 2);
     $totalAmount = round($subTotal + $vat, 2);
     $grandTotal = round(max(0, $totalAmount - $discount), 2);
     $due = round(max(0, $grandTotal - $paid), 2);
@@ -84,9 +89,10 @@ try {
     $paidStr = number_format($paid, 2, '.', '');
     $dueStr = number_format($due, 2, '.', '');
 
-    $orderStmt = $connect->prepare('INSERT INTO orders (order_date, client_name, client_contact, sub_total, vat, total_amount, discount, grand_total, paid, due, payment_type, payment_status, order_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
+    $orderStmt = $connect->prepare('INSERT INTO orders (branch_id, order_date, client_name, client_contact, sub_total, vat, total_amount, discount, grand_total, paid, due, payment_type, payment_status, order_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
     $orderStmt->bind_param(
-        'ssssssssssii',
+        'issssssssssii',
+        $branchId,
         $orderDate,
         $clientName,
         $clientContact,
@@ -110,6 +116,21 @@ try {
         $itemStmt->execute();
     }
     $itemStmt->close();
+
+    if ($paid > 0) {
+        sb_record_pos_cash_impact(
+            $connect,
+            $branchId,
+            $userId,
+            'sale_cash',
+            'in',
+            $paid,
+            $paymentType,
+            'order',
+            $orderId,
+            "Cobro de Orden #{$orderId} ({$clientName})"
+        );
+    }
 
     $connect->commit();
     $connect->close();

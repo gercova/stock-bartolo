@@ -3,8 +3,10 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
 
+$branchId = get_active_branch_id($connect);
 $sql = "SELECT
     p.product_id,
+    p.branch_id,
     p.product_name,
     p.product_image,
     p.brand_id,
@@ -16,18 +18,22 @@ $sql = "SELECT
     COALESCE(b.brand_name, 'Sin fabricante') AS brand_name,
     COALESCE(c.categories_name, 'Sin categoría') AS categories_name
 FROM product p
-LEFT JOIN brands b ON p.brand_id = b.brand_id
-LEFT JOIN categories c ON p.categories_id = c.categories_id
-WHERE p.status = 1
+LEFT JOIN brands b ON p.brand_id = b.brand_id AND b.branch_id = p.branch_id
+LEFT JOIN categories c ON p.categories_id = c.categories_id AND c.branch_id = p.branch_id
+WHERE p.branch_id = ? AND p.status = 1
 ORDER BY p.product_id DESC";
 
-$result = $connect->query($sql);
+$stmt = $connect->prepare($sql);
+$stmt->bind_param('i', $branchId);
+$stmt->execute();
+$result = $stmt->get_result();
 $products = [];
 
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $products[] = [
             'product_id' => (int)$row['product_id'],
+            'branch_id' => (int)$row['branch_id'],
             'product_name' => $row['product_name'],
             'product_image' => normalize_image_url($row['product_image']),
             'brand_id' => (int)$row['brand_id'],
@@ -42,6 +48,7 @@ if ($result) {
     }
 }
 
+$stmt->close();
 $connect->close();
 
 json_response([

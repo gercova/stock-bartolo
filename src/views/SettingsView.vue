@@ -1,5 +1,35 @@
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="space-y-6">
+    <!-- Quick Access to System Configuration & Cash Modules -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 shadow-xs">
+      <div class="flex items-start gap-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
+          <SlidersHorizontal class="h-5 w-5" />
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Configuración del Sistema y Sucursales</h2>
+          <p class="text-xs text-slate-600 mt-0.5">
+            Gestiona el capital operativo de <strong>Caja General</strong>, las sucursales multi-tenant, los parámetros fiscales y el módulo de <strong>Caja</strong>.
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <RouterLink
+          to="/system-config"
+          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+        >
+          Ir a Config. del Sistema
+        </RouterLink>
+        <RouterLink
+          to="/cash-register"
+          class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+        >
+          Ir a Caja
+        </RouterLink>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Change Username Card -->
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
       <div class="flex items-center gap-3 mb-5">
@@ -87,12 +117,14 @@
         </button>
       </form>
     </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
-import { UserCog, KeyRound, CheckCircle2, Loader2 } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
+import { UserCog, KeyRound, CheckCircle2, Loader2, SlidersHorizontal } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'

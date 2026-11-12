@@ -2,7 +2,8 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
-ensure_loan_schema($connect);
+
+$branchId = get_active_branch_id($connect);
 
 $sql = "SELECT
     l.*,
@@ -10,10 +11,13 @@ $sql = "SELECT
     (SELECT COUNT(*) FROM loan_payments lp WHERE lp.loan_id = l.loan_id) AS payments_count
 FROM loans l
 LEFT JOIN users u ON l.user_id = u.user_id
-WHERE l.record_status = 1
+WHERE l.branch_id = ? AND l.record_status = 1
 ORDER BY l.loan_id DESC";
 
-$result = $connect->query($sql);
+$stmt = $connect->prepare($sql);
+$stmt->bind_param('i', $branchId);
+$stmt->execute();
+$result = $stmt->get_result();
 $loans = [];
 $today = date('Y-m-d');
 
@@ -65,6 +69,7 @@ if ($result) {
 
         $loans[] = [
             'loan_id' => (int)$row['loan_id'],
+            'branch_id' => (int)$row['branch_id'],
             'loan_code' => $row['loan_code'],
             'user_id' => (int)$row['user_id'],
             'issued_by' => $row['issued_by'],
@@ -91,6 +96,8 @@ if ($result) {
         ];
     }
 }
+
+$stmt->close();
 
 foreach (['totalPrincipal', 'totalInterest', 'totalAmount', 'totalCollected', 'totalPending'] as $k) {
     $summary[$k] = round($summary[$k], 2);

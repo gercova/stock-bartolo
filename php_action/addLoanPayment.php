@@ -2,8 +2,8 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
-ensure_app_schema($connect);
 
+$branchId = get_active_branch_id($connect);
 $data = get_request_data();
 
 $userId = (int)$_SESSION['userId'];
@@ -24,8 +24,8 @@ if (!in_array($paymentMethod, [1, 2, 3], true)) {
 $connect->begin_transaction();
 
 try {
-    $stmt = $connect->prepare('SELECT total_amount, paid_amount, balance_due FROM loans WHERE loan_id = ? AND record_status = 1 FOR UPDATE');
-    $stmt->bind_param('i', $loanId);
+    $stmt = $connect->prepare('SELECT loan_code, client_name, total_amount, paid_amount, balance_due FROM loans WHERE loan_id = ? AND branch_id = ? AND record_status = 1 FOR UPDATE');
+    $stmt->bind_param('ii', $loanId, $branchId);
     $stmt->execute();
     $loan = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -33,7 +33,7 @@ try {
     if (!$loan) {
         $connect->rollback();
         $connect->close();
-        send_http_error(404, 'Préstamo no encontrado.');
+        send_http_error(404, 'Préstamo no encontrado en la sucursal activa.');
     }
 
     $balance = round((float)$loan['balance_due'], 2);
@@ -49,9 +49,10 @@ try {
         send_http_error(400, 'El abono no puede superar el saldo pendiente ($' . number_format($balance, 2) . ').');
     }
 
-    $payStmt = $connect->prepare('INSERT INTO loan_payments (loan_id, user_id, payment_date, amount, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?)');
-    $payStmt->bind_param('iisdis', $loanId, $userId, $paymentDate, $amount, $paymentMethod, $notes);
+    $payStmt = $connect->prepare('INSERT INTO loan_payments (branch_id, loan_id, user_id, payment_date, amount, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $payStmt->bind_param('iiisdis', $branchId, $loanId, $userId, $paymentDate, $amount, $paymentMethod, $notes);
     $payStmt->execute();
+    $payId = $connect->insert_id;
     $payStmt->close();
 
     $newPaid = round((float)$loan['paid_amount'] + $amount, 2);
@@ -59,10 +60,23 @@ try {
     $newBalance = round(max(0, $totalAmount - $newPaid), 2);
     $newStatus = $newBalance <= 0 ? 3 : 2;
 
-    $updStmt = $connect->prepare('UPDATE loans SET paid_amount = ?, balance_due = ?, loan_status = ? WHERE loan_id = ?');
-    $updStmt->bind_param('ddii', $newPaid, $newBalance, $newStatus, $loanId);
+    $updStmt = $connect->prepare('UPDATE loans SET paid_amount = ?, balance_due = ?, loan_status = ? WHERE loan_id = ? AND branch_id = ?');
+    $updStmt->bind_param('ddiii', $newPaid, $newBalance, $newStatus, $loanId, $branchId);
     $updStmt->execute();
     $updStmt->close();
+
+    sb_record_pos_cash_impact(
+        $connect,
+        $branchId,
+        $userId,
+        'loan_payment_cash',
+        'in',
+        $amount,
+        $paymentMethod,
+        'loan_payment',
+        $payId,
+        "Abono préstamo {$loan['loan_code']} ({$loan['client_name']})"
+    );
 
     $connect->commit();
     $connect->close();
@@ -74,6 +88,10 @@ try {
         'balance_due' => $newBalance,
         'loan_status' => $newStatus,
     ]);
+} catch (InvalidArgumentException $e) {
+    $connect->rollback();
+    $connect->close();
+    send_http_error(400, $e->getMessage());
 } catch (Throwable $e) {
     $connect->rollback();
     $connect->close();

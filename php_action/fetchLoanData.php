@@ -2,8 +2,8 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
-ensure_loan_schema($connect);
 
+$branchId = get_active_branch_id($connect);
 $data = array_merge($_GET, get_request_data());
 $loanId = (int)($data['loanId'] ?? $data['id'] ?? 0);
 
@@ -11,8 +11,8 @@ if ($loanId <= 0) {
     send_http_error(400, 'ID de préstamo inválido.');
 }
 
-$stmt = $connect->prepare("SELECT l.*, COALESCE(u.username, 'Sistema') AS issued_by FROM loans l LEFT JOIN users u ON l.user_id = u.user_id WHERE l.loan_id = ? AND l.record_status = 1 LIMIT 1");
-$stmt->bind_param('i', $loanId);
+$stmt = $connect->prepare("SELECT l.*, COALESCE(u.username, 'Sistema') AS issued_by FROM loans l LEFT JOIN users u ON l.user_id = u.user_id WHERE l.loan_id = ? AND l.branch_id = ? AND l.record_status = 1 LIMIT 1");
+$stmt->bind_param('ii', $loanId, $branchId);
 $stmt->execute();
 $res = $stmt->get_result();
 $row = $res ? $res->fetch_assoc() : null;
@@ -20,7 +20,7 @@ $stmt->close();
 
 if (!$row) {
     $connect->close();
-    send_http_error(404, 'Préstamo no encontrado.');
+    send_http_error(404, 'Préstamo no encontrado en la sucursal activa.');
 }
 
 $payStmt = $connect->prepare("SELECT lp.payment_id, lp.loan_id, lp.user_id, lp.payment_date, lp.amount, lp.payment_method, lp.notes, lp.created_at, COALESCE(u.username, 'Sistema') AS recorded_by FROM loan_payments lp LEFT JOIN users u ON lp.user_id = u.user_id WHERE lp.loan_id = ? ORDER BY lp.payment_date DESC, lp.payment_id DESC");
@@ -53,6 +53,7 @@ json_response([
     'success' => true,
     'loan' => [
         'loan_id' => (int)$row['loan_id'],
+        'branch_id' => (int)$row['branch_id'],
         'loan_code' => $row['loan_code'],
         'user_id' => (int)$row['user_id'],
         'issued_by' => $row['issued_by'],

@@ -3,14 +3,30 @@
     <!-- Top Welcome & Date Banner -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
       <div>
-        <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
-          Panel General
-        </h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
+            Panel General
+          </h2>
+          <span
+            v-if="stats.branch || auth.activeBranch"
+            class="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-600/20"
+          >
+            <Store class="h-3.5 w-3.5" />
+            Sucursal activa: {{ (stats.branch || auth.activeBranch).branch_code }} · {{ (stats.branch || auth.activeBranch).branch_name }}
+          </span>
+        </div>
         <p class="text-sm text-slate-500 mt-0.5">
-          Resumen de inventario, ventas e historial de préstamos — {{ formattedToday }}
+          Resumen de inventario, ventas, caja y préstamos — {{ formattedToday }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2.5">
+        <RouterLink
+          to="/cash-register"
+          class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+        >
+          <Calculator class="h-4 w-4" />
+          Caja
+        </RouterLink>
         <RouterLink
           to="/loans"
           class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
@@ -89,6 +105,101 @@
           Por cobrar: <span class="font-semibold text-slate-700">{{ formatCurrency(stats.loans.totalPending) }}</span>
         </p>
       </RouterLink>
+    </div>
+
+    <!-- General Cash & Operational Cash Till Strip -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Caja General Card -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between gap-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <Landmark class="h-5 w-5" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Caja General (Capital Sucursal)</p>
+              <h3 class="text-sm font-bold text-slate-900 truncate">
+                {{ stats.generalCash?.account_name || 'Fondo operativo principal' }}
+              </h3>
+            </div>
+          </div>
+          <StatusBadge
+            v-if="stats.generalCash"
+            :variant="stats.generalCash.status !== 1 ? 'danger' : stats.generalCash.is_below_min ? 'warning' : 'success'"
+            :label="stats.generalCash.status !== 1 ? 'Bloqueada' : stats.generalCash.is_below_min ? 'Saldo bajo' : 'Activa'"
+          />
+        </div>
+
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p class="text-2xl font-extrabold text-slate-900">
+              {{ formatCurrency(stats.generalCash?.current_balance || 0) }}
+            </p>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Alerta mínimo: {{ formatCurrency(stats.generalCash?.min_balance_alert || 0) }}
+            </p>
+          </div>
+
+          <RouterLink
+            to="/system-config?tab=general-cash"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+          >
+            Administrar Caja General →
+          </RouterLink>
+        </div>
+      </div>
+
+      <!-- Operational Cash Till Card -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between gap-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+              :class="stats.activeTillSession ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'"
+            >
+              <Calculator class="h-5 w-5" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Caja Registradora</p>
+              <h3 class="text-sm font-bold text-slate-900 truncate">
+                {{
+                  stats.activeTillSession
+                    ? `${stats.activeTillSession.register_name} · ${stats.activeTillSession.session_code}`
+                    : 'Sin turno abierto en la sucursal'
+                }}
+              </h3>
+            </div>
+          </div>
+          <StatusBadge
+            :variant="stats.activeTillSession ? 'success' : 'neutral'"
+            :label="stats.activeTillSession ? 'Turno Abierto' : 'Cerrada'"
+          />
+        </div>
+
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div v-if="stats.activeTillSession">
+            <p class="text-2xl font-extrabold text-emerald-700">
+              {{ formatCurrency(stats.activeTillSession.expected_cash) }}
+            </p>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Esperado en gaveta · Inicial {{ formatCurrency(stats.activeTillSession.opening_amount) }}
+            </p>
+          </div>
+          <div v-else>
+            <p class="text-sm font-semibold text-slate-700">Lista para apertura</p>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Abre turno, registra arqueos y ejecuta el Corte Z.
+            </p>
+          </div>
+
+          <RouterLink
+            to="/cash-register"
+            class="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
+          >
+            {{ stats.activeTillSession ? 'Arqueo / Cierre →' : 'Abrir Caja →' }}
+          </RouterLink>
+        </div>
+      </div>
     </div>
 
     <!-- Financial & Calendar Row -->
@@ -241,11 +352,16 @@ import {
   HandCoins,
   DollarSign,
   Plus,
+  Store,
+  Landmark,
+  Calculator,
 } from '@lucide/vue'
+import { useAuthStore } from '@/stores/auth'
 import { useDashboardStore } from '@/stores/dashboard'
 import { formatCurrency, formatDate, orderPaymentStatusMeta, loanStatusMeta } from '@/utils/formatters'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 
+const auth = useAuthStore()
 const dashboardStore = useDashboardStore()
 const { stats } = storeToRefs(dashboardStore)
 

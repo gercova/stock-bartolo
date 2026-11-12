@@ -5,12 +5,30 @@ import apiClient, {
   extractErrorMessage,
   setCsrfToken,
 } from '@/api/client'
+import { setActiveCurrency } from '@/utils/formatters'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
+  const activeBranch = ref(null)
+  const branches = ref([])
+  const systemConfig = ref(null)
   const authenticated = ref(false)
   const checked = ref(false)
   const loading = ref(false)
+  const switchingBranch = ref(false)
+
+  function applyTenantPayload(data) {
+    if (data?.activeBranch) {
+      activeBranch.value = data.activeBranch
+      setActiveCurrency(data.activeBranch.currency_code, data.activeBranch.currency_symbol)
+    }
+    if (Array.isArray(data?.branches)) {
+      branches.value = data.branches
+    }
+    if (data?.systemConfig) {
+      systemConfig.value = data.systemConfig
+    }
+  }
 
   async function checkAuth(force = false) {
     if (checked.value && !force) {
@@ -21,9 +39,19 @@ export const useAuthStore = defineStore('auth', () => {
       if (data?.csrfToken) setCsrfToken(data.csrfToken)
       authenticated.value = Boolean(data?.authenticated)
       user.value = data?.user || null
+      if (authenticated.value) {
+        applyTenantPayload(data)
+      } else {
+        activeBranch.value = null
+        branches.value = []
+        systemConfig.value = null
+      }
     } catch {
       authenticated.value = false
       user.value = null
+      activeBranch.value = null
+      branches.value = []
+      systemConfig.value = null
     } finally {
       checked.value = true
     }
@@ -41,12 +69,24 @@ export const useAuthStore = defineStore('auth', () => {
       if (data?.csrfToken) setCsrfToken(data.csrfToken)
       authenticated.value = Boolean(data?.authenticated)
       user.value = data?.user || null
+      applyTenantPayload(data)
       checked.value = true
       return { ok: true, message: data?.messages || 'Inicio de sesión exitoso' }
     } catch (err) {
       return { ok: false, message: extractErrorMessage(err, 'Credenciales inválidas.') }
     } finally {
       loading.value = false
+    }
+  }
+
+  async function switchBranch(branchId) {
+    switchingBranch.value = true
+    try {
+      const { data } = await apiClient.post('/switchBranch.php', { branchId })
+      applyTenantPayload(data)
+      return data
+    } finally {
+      switchingBranch.value = false
     }
   }
 
@@ -62,6 +102,10 @@ export const useAuthStore = defineStore('auth', () => {
   function clearSession() {
     authenticated.value = false
     user.value = null
+    activeBranch.value = null
+    branches.value = []
+    systemConfig.value = null
+    setActiveCurrency('USD', '$')
     checked.value = true
   }
 
@@ -87,11 +131,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user,
+    activeBranch,
+    branches,
+    systemConfig,
     authenticated,
     checked,
     loading,
+    switchingBranch,
+    applyTenantPayload,
     checkAuth,
     login,
+    switchBranch,
     logout,
     clearSession,
     updateUsername,

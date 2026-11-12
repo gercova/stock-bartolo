@@ -3,8 +3,10 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
 
+$branchId = get_active_branch_id($connect);
 $sql = "SELECT
     o.order_id,
+    o.branch_id,
     o.order_date,
     o.client_name,
     o.client_contact,
@@ -20,16 +22,20 @@ $sql = "SELECT
     o.order_status,
     (SELECT COUNT(*) FROM order_item oi WHERE oi.order_id = o.order_id AND oi.order_item_status = 1) AS item_count
 FROM orders o
-WHERE o.order_status = 1
+WHERE o.branch_id = ? AND o.order_status = 1
 ORDER BY o.order_id DESC";
 
-$result = $connect->query($sql);
+$stmt = $connect->prepare($sql);
+$stmt->bind_param('i', $branchId);
+$stmt->execute();
+$result = $stmt->get_result();
 $orders = [];
 
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $orders[] = [
             'order_id' => (int)$row['order_id'],
+            'branch_id' => (int)$row['branch_id'],
             'order_date' => $row['order_date'],
             'client_name' => $row['client_name'],
             'client_contact' => $row['client_contact'],
@@ -47,6 +53,7 @@ if ($result) {
     }
 }
 
+$stmt->close();
 $connect->close();
 
 json_response([

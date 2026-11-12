@@ -17,15 +17,15 @@ if (empty($_SESSION['userId'])) {
 }
 
 $userId = (int)$_SESSION['userId'];
-$stmt = $connect->prepare('SELECT user_id, username, email FROM users WHERE user_id = ? LIMIT 1');
+$stmt = $connect->prepare('SELECT user_id, username, email, role, branch_id, active FROM users WHERE user_id = ? LIMIT 1');
 $stmt->bind_param('i', $userId);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result ? $result->fetch_assoc() : null;
 $stmt->close();
-$connect->close();
 
-if (!$user) {
+if (!$user || (isset($user['active']) && (int)$user['active'] !== 1)) {
+    $connect->close();
     $_SESSION = [];
     $csrfToken = rotate_csrf_token();
     json_response([
@@ -33,8 +33,20 @@ if (!$user) {
         'authenticated' => false,
         'csrfToken' => $csrfToken,
         'user' => null,
+        'activeBranch' => null,
+        'branches' => [],
+        'systemConfig' => null,
     ]);
 }
+
+$role = (string)($user['role'] ?? 'superadmin');
+$_SESSION['user_role'] = $role;
+$_SESSION['assigned_branch_id'] = max(1, (int)($user['branch_id'] ?? 1));
+
+$activeBranch = get_active_branch($connect);
+$accessibleBranches = sb_get_accessible_branches($connect);
+$systemConfig = sb_get_system_config($connect);
+$connect->close();
 
 json_response([
     'success' => true,
@@ -44,5 +56,11 @@ json_response([
         'user_id' => (int)$user['user_id'],
         'username' => $user['username'],
         'email' => $user['email'] ?? '',
+        'role' => $role,
+        'branch_id' => $_SESSION['assigned_branch_id'],
+        'can_switch_branches' => in_array($role, ['superadmin', 'admin'], true),
     ],
+    'activeBranch' => $activeBranch,
+    'branches' => $accessibleBranches,
+    'systemConfig' => $systemConfig,
 ]);

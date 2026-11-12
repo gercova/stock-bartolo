@@ -14,6 +14,8 @@ import OrdersListView from '@/views/OrdersListView.vue'
 import OrderFormView from '@/views/OrderFormView.vue'
 import LoansView from '@/views/LoansView.vue'
 import ReportsView from '@/views/ReportsView.vue'
+import CashRegisterView from '@/views/CashRegisterView.vue'
+import SystemConfigView from '@/views/SystemConfigView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import ErrorView from '@/views/ErrorView.vue'
 
@@ -100,10 +102,25 @@ const routes = [
         meta: { title: 'Reportes', breadcrumb: ['Inicio', 'Reportes'] },
       },
       {
+        path: 'cash-register',
+        name: 'cash-register',
+        component: CashRegisterView,
+        meta: { title: 'Caja', breadcrumb: ['Inicio', 'Finanzas y Caja', 'Caja'] },
+      },
+      {
+        path: 'system-config',
+        name: 'system-config',
+        component: SystemConfigView,
+        meta: {
+          title: 'Configuración del Sistema',
+          breadcrumb: ['Inicio', 'Sistema', 'Configuración del Sistema'],
+        },
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: SettingsView,
-        meta: { title: 'Configuración', breadcrumb: ['Inicio', 'Configuración'] },
+        meta: { title: 'Cuenta y Seguridad', breadcrumb: ['Inicio', 'Sistema', 'Cuenta y Seguridad'] },
       },
     ],
   },

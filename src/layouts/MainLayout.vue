@@ -26,7 +26,9 @@
           </div>
           <div v-if="!ui.sidebarCollapsed" class="min-w-0">
             <p class="text-sm font-bold tracking-tight text-white truncate">Stock Bartolo</p>
-            <p class="text-[11px] text-slate-400 truncate">Inventario &amp; Crédito</p>
+            <p class="text-[11px] text-indigo-300 truncate">
+              {{ auth.activeBranch ? `${auth.activeBranch.branch_code} · ${auth.activeBranch.branch_name}` : 'Inventario & Crédito' }}
+            </p>
           </div>
         </RouterLink>
 
@@ -142,8 +144,81 @@
           </div>
         </div>
 
-        <!-- Quick Actions & User Menu -->
-        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <!-- Quick Actions, Branch Switcher & User Menu -->
+        <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <!-- Branch Tenant Switcher Dropdown -->
+          <div v-if="auth.activeBranch" class="relative" ref="branchMenuRef">
+            <button
+              type="button"
+              class="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 transition"
+              :disabled="!canSwitchBranch || auth.switchingBranch"
+              :title="canSwitchBranch ? 'Cambiar sucursal activa (Multi-Tenant)' : 'Sucursal asignada'"
+              aria-label="Selector de sucursal activa"
+              @click="canSwitchBranch && (branchMenuOpen = !branchMenuOpen)"
+            >
+              <Store class="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+              <span class="max-w-[68px] sm:max-w-[135px] truncate">
+                <span class="sm:hidden">{{ auth.activeBranch.branch_code }}</span>
+                <span class="hidden sm:inline">{{ auth.activeBranch.branch_code }} · {{ auth.activeBranch.branch_name }}</span>
+              </span>
+              <ChevronDown v-if="canSwitchBranch" class="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+            </button>
+
+            <div
+              v-if="branchMenuOpen && canSwitchBranch"
+              class="absolute right-0 mt-2 w-72 origin-top-right rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5 z-50"
+            >
+              <div class="border-b border-slate-100 px-3.5 py-2 flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Sucursales ({{ auth.branches.length }})
+                </span>
+                <span class="text-[11px] text-indigo-600 font-semibold">Multi-Tenant</span>
+              </div>
+
+              <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
+                <button
+                  v-for="b in auth.branches"
+                  :key="b.branch_id"
+                  type="button"
+                  class="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-slate-50 transition"
+                  :class="b.branch_id === auth.activeBranch?.branch_id ? 'bg-indigo-50/60' : ''"
+                  @click="handleSwitchBranch(b.branch_id)"
+                >
+                  <div class="min-w-0">
+                    <p class="text-xs font-bold text-slate-900 truncate">
+                      {{ b.branch_code }} · {{ b.branch_name }}
+                    </p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">
+                      Caja Gen: {{ formatCurrency(b.general_cash_balance || 0, b.currency_code) }}
+                    </p>
+                  </div>
+                  <Check
+                    v-if="b.branch_id === auth.activeBranch?.branch_id"
+                    class="h-4 w-4 text-indigo-600 shrink-0"
+                  />
+                </button>
+              </div>
+
+              <div class="border-t border-slate-100 pt-1">
+                <RouterLink
+                  to="/system-config?tab=branches"
+                  class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                  @click="branchMenuOpen = false"
+                >
+                  <Building2 class="h-3.5 w-3.5" />
+                  Administrar sucursales y Caja General
+                </RouterLink>
+              </div>
+            </div>
+          </div>
+
+          <RouterLink
+            to="/cash-register"
+            class="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+          >
+            <Calculator class="h-4 w-4" />
+            Caja
+          </RouterLink>
           <RouterLink
             to="/loans"
             class="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
@@ -175,19 +250,29 @@
 
             <div
               v-if="userMenuOpen"
-              class="absolute right-0 mt-2 w-52 origin-top-right rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5 z-50"
+              class="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5 z-50"
             >
               <div class="border-b border-slate-100 px-3.5 py-2">
                 <p class="text-xs font-semibold text-slate-900 truncate">{{ auth.user?.username }}</p>
-                <p class="text-[11px] text-slate-500">Administrador / Usuario</p>
+                <p class="text-[11px] text-slate-500">
+                  {{ auth.activeBranch ? auth.activeBranch.branch_name : 'Administrador' }}
+                </p>
               </div>
+              <RouterLink
+                to="/system-config"
+                class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                @click="userMenuOpen = false"
+              >
+                <SlidersHorizontal class="h-4 w-4 text-slate-400" />
+                Config. del Sistema
+              </RouterLink>
               <RouterLink
                 to="/settings"
                 class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 @click="userMenuOpen = false"
               >
                 <Settings class="h-4 w-4 text-slate-400" />
-                Configuración
+                Cuenta y Seguridad
               </RouterLink>
               <button
                 type="button"
@@ -204,7 +289,7 @@
 
       <!-- Main Workspace Area -->
       <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <RouterView />
+        <RouterView :key="`${route.fullPath}::branch-${auth.activeBranch?.branch_id || 1}`" />
       </main>
 
       <!-- Footer -->
@@ -228,7 +313,9 @@ import {
   ShoppingCart,
   PlusCircle,
   HandCoins,
+  Calculator,
   BarChart3,
+  SlidersHorizontal,
   Settings,
   LogOut,
   Menu,
@@ -238,9 +325,14 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
+  Store,
+  Building2,
+  Check,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { extractErrorMessage } from '@/api/client'
+import { formatCurrency } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -249,6 +341,12 @@ const ui = useUiStore()
 
 const userMenuOpen = ref(false)
 const userMenuRef = ref(null)
+const branchMenuOpen = ref(false)
+const branchMenuRef = ref(null)
+
+const canSwitchBranch = computed(
+  () => Boolean(auth.user?.can_switch_branches) && auth.branches.length > 0
+)
 
 const navGroups = [
   {
@@ -266,18 +364,20 @@ const navGroups = [
     ],
   },
   {
-    label: 'Ventas y Préstamos',
+    label: 'Ventas y Finanzas',
     items: [
       { label: 'Órdenes', to: '/orders', icon: ShoppingCart, match: ['/orders'] },
       { label: 'Agregar Orden', to: '/orders/create', icon: PlusCircle, match: ['/orders/create'] },
-      { label: 'Préstamos', to: '/loans', icon: HandCoins, match: ['/loans'], badge: 'Nuevo' },
+      { label: 'Caja', to: '/cash-register', icon: Calculator, match: ['/cash-register'], badge: 'Nuevo' },
+      { label: 'Préstamos', to: '/loans', icon: HandCoins, match: ['/loans'] },
       { label: 'Reportes', to: '/reports', icon: BarChart3, match: ['/reports'] },
     ],
   },
   {
     label: 'Sistema',
     items: [
-      { label: 'Configuración', to: '/settings', icon: Settings, match: ['/settings'] },
+      { label: 'Config. del Sistema', to: '/system-config', icon: SlidersHorizontal, match: ['/system-config'] },
+      { label: 'Cuenta y Seguridad', to: '/settings', icon: Settings, match: ['/settings'] },
     ],
   },
 ]
@@ -297,8 +397,20 @@ function isActive(item) {
   return item.match?.includes(route.path) || route.path === item.to
 }
 
+async function handleSwitchBranch(branchId) {
+  branchMenuOpen.value = false
+  if (branchId === auth.activeBranch?.branch_id) return
+  try {
+    const res = await auth.switchBranch(branchId)
+    ui.success(res?.messages || 'Sucursal cambiada correctamente.')
+  } catch (err) {
+    ui.error(extractErrorMessage(err))
+  }
+}
+
 async function handleLogout() {
   userMenuOpen.value = false
+  branchMenuOpen.value = false
   await auth.logout()
   ui.info('Has cerrado tu sesión correctamente.', 'Sesión cerrada')
   router.push({ name: 'login' })
@@ -307,6 +419,9 @@ async function handleLogout() {
 function handleClickOutside(event) {
   if (userMenuRef.value && !userMenuRef.value.contains(event.target)) {
     userMenuOpen.value = false
+  }
+  if (branchMenuRef.value && !branchMenuRef.value.contains(event.target)) {
+    branchMenuOpen.value = false
   }
 }
 

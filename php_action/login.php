@@ -19,7 +19,7 @@ if ($username === '' || $password === '') {
 $clientIp = get_client_ip();
 check_login_rate_limit($connect, $clientIp, $username);
 
-$stmt = $connect->prepare('SELECT user_id, username, password, email FROM users WHERE username = ? LIMIT 1');
+$stmt = $connect->prepare('SELECT user_id, username, password, email, role, branch_id, active FROM users WHERE username = ? LIMIT 1');
 if (!$stmt) {
     send_http_error(500, 'Error al preparar la consulta de autenticación.');
 }
@@ -57,6 +57,11 @@ if (!$user || !$validPassword) {
     );
 }
 
+if (isset($user['active']) && (int)$user['active'] !== 1) {
+    $connect->close();
+    send_http_error(403, 'Esta cuenta de usuario se encuentra inactiva.');
+}
+
 clear_login_attempts($connect, $clientIp, $username);
 
 if (password_needs_rehash($storedHash, PASSWORD_DEFAULT) && !password_verify($password, $storedHash)) {
@@ -73,10 +78,16 @@ if (password_needs_rehash($storedHash, PASSWORD_DEFAULT) && !password_verify($pa
 session_regenerate_id(true);
 $_SESSION['userId'] = (int)$user['user_id'];
 $_SESSION['username'] = $user['username'];
+$_SESSION['user_role'] = (string)($user['role'] ?? 'superadmin');
+$_SESSION['assigned_branch_id'] = max(1, (int)($user['branch_id'] ?? 1));
+$_SESSION['active_branch_id'] = $_SESSION['assigned_branch_id'];
 $_SESSION['last_activity'] = time();
 
 $newCsrf = rotate_csrf_token();
 ensure_app_schema($connect);
+$activeBranch = get_active_branch($connect);
+$accessibleBranches = sb_get_accessible_branches($connect);
+$systemConfig = sb_get_system_config($connect);
 $connect->close();
 
 json_response([
@@ -88,5 +99,11 @@ json_response([
         'user_id' => (int)$user['user_id'],
         'username' => $user['username'],
         'email' => $user['email'] ?? '',
+        'role' => $_SESSION['user_role'],
+        'branch_id' => $_SESSION['assigned_branch_id'],
+        'can_switch_branches' => in_array($_SESSION['user_role'], ['superadmin', 'admin'], true),
     ],
+    'activeBranch' => $activeBranch,
+    'branches' => $accessibleBranches,
+    'systemConfig' => $systemConfig,
 ]);

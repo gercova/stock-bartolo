@@ -2,8 +2,8 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
-ensure_app_schema($connect);
 
+$branchId = get_active_branch_id($connect);
 $data = array_merge($_GET, get_request_data());
 $startDate = validate_iso_date($data['startDate'] ?? '', 'fecha inicial', true);
 $endDate = validate_iso_date($data['endDate'] ?? '', 'fecha final', true);
@@ -12,8 +12,8 @@ if ($startDate > $endDate) {
     send_http_error(400, 'La fecha inicial no puede ser posterior a la fecha final.');
 }
 
-$stmt = $connect->prepare('SELECT order_id, order_date, client_name, client_contact, grand_total, paid, due, payment_status FROM orders WHERE order_date >= ? AND order_date <= ? AND order_status = 1 ORDER BY order_date DESC, order_id DESC');
-$stmt->bind_param('ss', $startDate, $endDate);
+$stmt = $connect->prepare('SELECT order_id, order_date, client_name, client_contact, grand_total, paid, due, payment_status FROM orders WHERE branch_id = ? AND order_date >= ? AND order_date <= ? AND order_status = 1 ORDER BY order_date DESC, order_id DESC');
+$stmt->bind_param('iss', $branchId, $startDate, $endDate);
 $stmt->execute();
 $res = $stmt->get_result();
 
@@ -43,8 +43,8 @@ while ($row = $res->fetch_assoc()) {
 }
 $stmt->close();
 
-$loanStmt = $connect->prepare('SELECT l.loan_id, l.loan_code, l.loan_date, l.due_date, l.client_name, l.client_contact, l.principal_amount, l.has_interest, l.interest_rate, l.interest_amount, l.total_amount, l.paid_amount, l.balance_due, l.loan_status, COALESCE(u.username, "Sistema") AS issued_by FROM loans l LEFT JOIN users u ON l.user_id = u.user_id WHERE l.loan_date >= ? AND l.loan_date <= ? AND l.record_status = 1 ORDER BY l.loan_date DESC, l.loan_id DESC');
-$loanStmt->bind_param('ss', $startDate, $endDate);
+$loanStmt = $connect->prepare('SELECT l.loan_id, l.loan_code, l.loan_date, l.due_date, l.client_name, l.client_contact, l.principal_amount, l.has_interest, l.interest_rate, l.interest_amount, l.total_amount, l.paid_amount, l.balance_due, l.loan_status, COALESCE(u.username, "Sistema") AS issued_by FROM loans l LEFT JOIN users u ON l.user_id = u.user_id WHERE l.branch_id = ? AND l.loan_date >= ? AND l.loan_date <= ? AND l.record_status = 1 ORDER BY l.loan_date DESC, l.loan_id DESC');
+$loanStmt->bind_param('iss', $branchId, $startDate, $endDate);
 $loanStmt->execute();
 $loanRes = $loanStmt->get_result();
 

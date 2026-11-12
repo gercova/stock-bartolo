@@ -2,8 +2,8 @@
 
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
-ensure_app_schema($connect);
 
+$branchId = get_active_branch_id($connect);
 $data = get_request_data();
 
 $userId = (int)$_SESSION['userId'];
@@ -39,14 +39,14 @@ if ($dueDate !== null && $dueDate < $loanDate) {
 }
 
 if ($orderId !== null) {
-    $ordCheck = $connect->prepare('SELECT order_id FROM orders WHERE order_id = ? AND order_status = 1 LIMIT 1');
-    $ordCheck->bind_param('i', $orderId);
+    $ordCheck = $connect->prepare('SELECT order_id FROM orders WHERE order_id = ? AND branch_id = ? AND order_status = 1 LIMIT 1');
+    $ordCheck->bind_param('ii', $orderId, $branchId);
     $ordCheck->execute();
     $ordExists = $ordCheck->get_result()->fetch_assoc();
     $ordCheck->close();
     if (!$ordExists) {
         $connect->close();
-        send_http_error(400, 'La orden asociada seleccionada no existe.');
+        send_http_error(400, 'La orden asociada seleccionada no pertenece a la sucursal activa.');
     }
 }
 
@@ -80,9 +80,10 @@ $tempCode = 'PREST-TMP';
 $connect->begin_transaction();
 
 try {
-    $stmt = $connect->prepare('INSERT INTO loans (loan_code, user_id, client_name, client_contact, client_document, order_id, loan_date, due_date, principal_amount, has_interest, interest_rate, interest_mode, term_months, interest_amount, total_amount, paid_amount, balance_due, loan_status, record_status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)');
+    $stmt = $connect->prepare('INSERT INTO loans (branch_id, loan_code, user_id, client_name, client_contact, client_document, order_id, loan_date, due_date, principal_amount, has_interest, interest_rate, interest_mode, term_months, interest_amount, total_amount, paid_amount, balance_due, loan_status, record_status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)');
     $stmt->bind_param(
-        'sisssissdidsiddddis',
+        'isisssissdidsiddddis',
+        $branchId,
         $tempCode,
         $userId,
         $clientName,
@@ -113,12 +114,41 @@ try {
     $codeStmt->execute();
     $codeStmt->close();
 
+    if ($paymentMethod === 2 && $orderId === null) {
+        sb_record_pos_cash_impact(
+            $connect,
+            $branchId,
+            $userId,
+            'loan_disbursement',
+            'out',
+            $principal,
+            2,
+            'loan',
+            $loanId,
+            "Desembolso de préstamo {$loanCode} ({$clientName})"
+        );
+    }
+
     if ($initialPayment > 0) {
         $payNote = 'Abono inicial al emitir préstamo';
-        $payStmt = $connect->prepare('INSERT INTO loan_payments (loan_id, user_id, payment_date, amount, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?)');
-        $payStmt->bind_param('iisdis', $loanId, $userId, $loanDate, $initialPayment, $paymentMethod, $payNote);
+        $payStmt = $connect->prepare('INSERT INTO loan_payments (branch_id, loan_id, user_id, payment_date, amount, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $payStmt->bind_param('iiisdis', $branchId, $loanId, $userId, $loanDate, $initialPayment, $paymentMethod, $payNote);
         $payStmt->execute();
+        $payId = $connect->insert_id;
         $payStmt->close();
+
+        sb_record_pos_cash_impact(
+            $connect,
+            $branchId,
+            $userId,
+            'loan_payment_cash',
+            'in',
+            $initialPayment,
+            $paymentMethod,
+            'loan_payment',
+            $payId,
+            "Abono inicial préstamo {$loanCode} ({$clientName})"
+        );
     }
 
     $connect->commit();
@@ -130,6 +160,10 @@ try {
         'loan_id' => $loanId,
         'loan_code' => $loanCode,
     ], 201);
+} catch (InvalidArgumentException $e) {
+    $connect->rollback();
+    $connect->close();
+    send_http_error(400, $e->getMessage());
 } catch (Throwable $e) {
     $connect->rollback();
     $connect->close();
