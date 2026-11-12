@@ -205,10 +205,10 @@ $cSql = "SELECT
         WHERE c.record_status = 1
         GROUP BY c.client_id";
 
-$cStmt = $connect->prepare($cSql);
+$cStmt  = $connect->prepare($cSql);
 $cStmt->bind_param('i', $year);
 $cStmt->execute();
-$cRes = $cStmt->get_result();
+$cRes   = $cStmt->get_result();
 
 $allClients = [];
 while ($cRow = $cRes->fetch_assoc()) {

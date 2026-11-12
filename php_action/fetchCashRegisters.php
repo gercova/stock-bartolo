@@ -24,13 +24,13 @@ $res = $stmt->get_result();
 $registers = [];
 while ($row = $res->fetch_assoc()) {
     $registers[] = [
-        'register_id' => (int)$row['register_id'],
-        'branch_id' => (int)$row['branch_id'],
-        'register_code' => $row['register_code'],
-        'register_name' => $row['register_name'],
-        'location' => $row['location'] ?? '',
-        'active' => (int)$row['active'],
-        'open_session_id' => $row['open_session_id'] !== null ? (int)$row['open_session_id'] : null,
+        'register_id'       => (int)$row['register_id'],
+        'branch_id'         => (int)$row['branch_id'],
+        'register_code'     => $row['register_code'],
+        'register_name'     => $row['register_name'],
+        'location'          => $row['location'] ?? '',
+        'active'            => (int)$row['active'],
+        'open_session_id'   => $row['open_session_id'] !== null ? (int)$row['open_session_id'] : null,
         'open_session_code' => $row['open_session_code'] ?? null,
         'open_expected_cash' => $row['open_expected_cash'] !== null ? round((float)$row['open_expected_cash'], 2) : null,
     ];
@@ -39,7 +39,7 @@ $stmt->close();
 $connect->close();
 
 json_response([
-    'success' => true,
-    'data' => $registers,
+    'success'   => true,
+    'data'      => $registers,
 ]);
 

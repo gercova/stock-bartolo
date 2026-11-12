@@ -328,10 +328,13 @@ import {
   Trash2,
   Loader2,
 } from '@lucide/vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useLoansStore } from '@/stores/loans'
 import { useOrdersStore } from '@/stores/orders'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
+import { checkOpenCashSession, promptOpenCashRegister } from '@/utils/cashRegisterPrompt'
 import { formatCurrency, formatDate, loanStatusMeta } from '@/utils/formatters'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -339,6 +342,8 @@ import LoanFormModal from '@/components/loans/LoanFormModal.vue'
 import LoanPaymentModal from '@/components/loans/LoanPaymentModal.vue'
 import LoanDetailModal from '@/components/loans/LoanDetailModal.vue'
 
+const router = useRouter()
+const auth = useAuthStore()
 const store = useLoansStore()
 const ordersStore = useOrdersStore()
 const ui = useUiStore()
@@ -377,7 +382,12 @@ const filtered = computed(() => {
   })
 })
 
-function openCreate() {
+async function openCreate() {
+  const cashStatus = await checkOpenCashSession()
+  if (!cashStatus.isOpen) {
+    await promptOpenCashRegister(router, auth.activeBranch?.branch_name || cashStatus.branchName, 'emisión de préstamos')
+    return
+  }
   editingLoan.value = null
   formOpen.value = true
 }
@@ -388,6 +398,11 @@ function openEdit(loan) {
 }
 
 async function openPayment(loan) {
+  const cashStatus = await checkOpenCashSession()
+  if (!cashStatus.isOpen) {
+    await promptOpenCashRegister(router, auth.activeBranch?.branch_name || cashStatus.branchName, 'abonos y cobros de préstamos')
+    return
+  }
   selectedLoan.value = loan
   paymentOpen.value = true
   loadingDetail.value = true

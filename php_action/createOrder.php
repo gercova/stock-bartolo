@@ -20,7 +20,9 @@ $items          = $data['items'] ?? [];
 // Enforce open cash register for all commercial/business operations across all branches
 $openSession = sb_get_open_cash_session($connect, $branchId);
 if (!$openSession) {
-    send_http_error(400, 'Para realizar cualquier actividad comercial u orden de venta, la caja registradora de la sucursal debe estar abierta. Por favor, abre un turno de caja antes de continuar.');
+    $activeBranch = get_active_branch($connect);
+    $bName = $activeBranch['branch_name'] ?? 'esta sucursal';
+    send_http_error(400, "Para realizar ventas o emitir comprobantes en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
 }
 
 $clientId       = isset($data['clientId']) && (int)$data['clientId'] > 0

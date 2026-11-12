@@ -5,32 +5,32 @@ require_method(['POST', 'PUT']);
 
 sb_assert_permission($connect, 'users', 'update');
 
-$data = get_request_data();
-$targetUserId = (int)($data['user_id'] ?? $data['userId'] ?? 0);
-$currentUserId = (int)($_SESSION['userId'] ?? 0);
+$data           = get_request_data();
+$targetUserId   = (int)($data['user_id'] ?? $data['userId'] ?? 0);
+$currentUserId  = (int)($_SESSION['userId'] ?? 0);
 
 if ($targetUserId <= 0) {
     send_http_error(400, 'Identificador de usuario no válido.');
 }
 
 // Fetch existing user data
-$stmt = $connect->prepare('SELECT u.user_id, u.username, u.email, u.phone, u.full_name, u.role, u.role_id, u.branch_id, u.active, r.role_slug, r.role_name FROM users u LEFT JOIN roles r ON u.role_id = r.role_id WHERE u.user_id = ? LIMIT 1');
+$stmt       = $connect->prepare('SELECT u.user_id, u.username, u.email, u.phone, u.full_name, u.role, u.role_id, u.branch_id, u.active, r.role_slug, r.role_name FROM users u LEFT JOIN roles r ON u.role_id = r.role_id WHERE u.user_id = ? LIMIT 1');
 $stmt->bind_param('i', $targetUserId);
 $stmt->execute();
-$existing = $stmt->get_result()->fetch_assoc();
+$existing   = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$existing) {
     send_http_error(404, 'El usuario solicitado no existe.');
 }
 
-$username = strtolower(trim((string)($data['username'] ?? $existing['username'])));
-$fullName = trim((string)($data['full_name'] ?? $existing['full_name']));
-$email = strtolower(trim((string)($data['email'] ?? $existing['email'])));
-$phone = trim((string)($data['phone'] ?? $existing['phone']));
-$roleId = isset($data['role_id']) && $data['role_id'] !== '' ? (int)$data['role_id'] : (int)$existing['role_id'];
-$branchId = isset($data['branch_id']) && $data['branch_id'] !== '' && (int)$data['branch_id'] > 0 ? (int)$data['branch_id'] : null;
-$active = isset($data['active']) ? ((int)$data['active'] === 1 ? 1 : 0) : (int)$existing['active'];
+$username   = strtolower(trim((string)($data['username'] ?? $existing['username'])));
+$fullName   = trim((string)($data['full_name'] ?? $existing['full_name']));
+$email      = strtolower(trim((string)($data['email'] ?? $existing['email'])));
+$phone      = trim((string)($data['phone'] ?? $existing['phone']));
+$roleId     = isset($data['role_id']) && $data['role_id'] !== '' ? (int)$data['role_id'] : (int)$existing['role_id'];
+$branchId   = isset($data['branch_id']) && $data['branch_id'] !== '' && (int)$data['branch_id'] > 0 ? (int)$data['branch_id'] : null;
+$active     = isset($data['active']) ? ((int)$data['active'] === 1 ? 1 : 0) : (int)$existing['active'];
 $newPassword = (string)($data['password'] ?? '');
 
 if ($username === '' || strlen($username) < 3 || strlen($username) > 50) {
@@ -122,11 +122,11 @@ if ($branchId !== null) {
     $bCheck->close();
 }
 
-$roleSlug = (string)$targetRole['role_slug'];
+$roleSlug   = (string)$targetRole['role_slug'];
 
 if ($newPassword !== '') {
-    $hash = password_hash($newPassword, PASSWORD_DEFAULT);
-    $upd = $connect->prepare('UPDATE users SET username = ?, password = ?, email = ?, phone = ?, full_name = ?, role = ?, role_id = ?, branch_id = ?, active = ?, updated_at = NOW() WHERE user_id = ?');
+    $hash   = password_hash($newPassword, PASSWORD_DEFAULT);
+    $upd    = $connect->prepare('UPDATE users SET username = ?, password = ?, email = ?, phone = ?, full_name = ?, role = ?, role_id = ?, branch_id = ?, active = ?, updated_at = NOW() WHERE user_id = ?');
     $upd->bind_param('ssssssiiii', $username, $hash, $email, $phone, $fullName, $roleSlug, $roleId, $branchId, $active, $targetUserId);
 } else {
     $upd = $connect->prepare('UPDATE users SET username = ?, email = ?, phone = ?, full_name = ?, role = ?, role_id = ?, branch_id = ?, active = ?, updated_at = NOW() WHERE user_id = ?');
@@ -146,13 +146,13 @@ sb_log_audit(
     'UPDATE',
     "Usuario '{$username}' (#{$targetUserId}) actualizado. Rol: '{$targetRole['role_name']}', Estado: " . ($active ? 'Activo' : 'Inactivo'),
     [
-        'user_id' => $targetUserId,
-        'username' => $username,
+        'user_id'   => $targetUserId,
+        'username'  => $username,
         'full_name' => $fullName,
-        'role_id' => $roleId,
+        'role_id'   => $roleId,
         'role_slug' => $roleSlug,
         'branch_id' => $branchId,
-        'active' => $active,
+        'active'    => $active,
         'password_changed' => ($newPassword !== ''),
     ]
 );
@@ -160,7 +160,7 @@ sb_log_audit(
 $connect->close();
 
 json_response([
-    'success' => true,
-    'messages' => "Usuario '{$username}' actualizado exitosamente.",
+    'success'   => true,
+    'messages'  => "Usuario '{$username}' actualizado exitosamente.",
 ]);
 

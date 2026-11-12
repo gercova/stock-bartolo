@@ -4,7 +4,7 @@
     <div
       v-if="!dropdownOpen"
       tabindex="0"
-      class="flex items-center justify-between gap-2 w-full rounded-lg border border-sky-400 bg-white px-3 py-1.5 text-sm text-slate-900 cursor-pointer hover:border-sky-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-400/30 transition shadow-2xs"
+      class="flex items-center justify-between gap-2 w-full h-[34px] rounded-[4px] border border-[#66afe9] shadow-[0_0_6px_rgba(102,175,233,0.35)] bg-white px-3 py-1 text-sm text-slate-800 cursor-pointer hover:border-[#5099d3] focus:border-[#5099d3] focus:outline-none focus:ring-1 focus:ring-[#66afe9]/40 transition"
       :class="{ 'opacity-60 cursor-not-allowed bg-slate-50': disabled }"
       @click.stop="toggleDropdown"
       @keydown.down.prevent="openDropdown"
@@ -12,10 +12,10 @@
       @keydown.space.prevent="openDropdown"
     >
       <div class="flex items-center gap-1.5 min-w-0 truncate">
-        <span v-if="displayLabel" class="text-slate-900 truncate font-normal">
+        <span v-if="displayLabel" class="text-slate-800 truncate font-normal text-xs sm:text-sm">
           {{ displayLabel }}
         </span>
-        <span v-else class="text-slate-400 truncate">
+        <span v-else class="text-slate-400 truncate text-xs sm:text-sm">
           {{ placeholder }}
         </span>
       </div>
@@ -24,13 +24,13 @@
         <button
           v-if="displayLabel && !disabled"
           type="button"
-          class="rounded p-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+          class="rounded p-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition opacity-0 hover:opacity-100 focus:opacity-100"
           title="Quitar cliente seleccionado"
           @click.stop="clearSelection"
         >
           <X class="h-3.5 w-3.5" />
         </button>
-        <span class="text-slate-500 text-xs select-none">▼</span>
+        <span class="text-slate-500 text-[10px] select-none">▼</span>
       </div>
     </div>
 
@@ -43,7 +43,7 @@
           v-model="searchTerm"
           type="text"
           :placeholder="placeholder"
-          class="w-full rounded-xl border-2 border-indigo-500 bg-white pl-9 pr-9 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-md"
+          class="w-full h-[34px] rounded-[4px] border-2 border-indigo-500 bg-white pl-9 pr-9 py-1 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-md"
           @input="onSearchInput"
           @keydown.down.prevent="navigateDown"
           @keydown.up.prevent="navigateUp"

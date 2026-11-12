@@ -3,25 +3,27 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
 
-$branchId = get_active_branch_id($connect);
-$activeBranch = get_active_branch($connect);
-$userId = (int)$_SESSION['userId'];
-$data = get_request_data();
+$branchId       = get_active_branch_id($connect);
+$activeBranch   = get_active_branch($connect);
+$userId         = (int)$_SESSION['userId'];
+$data           = get_request_data();
 
-$orderId = (int)($data['orderId'] ?? 0);
-$orderDate = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
-$clientName = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
-$clientContact = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
-$discount = round((float)($data['discount'] ?? 0), 2);
-$paid = round((float)($data['paid'] ?? 0), 2);
-$paymentType = (int)($data['paymentType'] ?? 0);
-$paymentStatus = (int)($data['paymentStatus'] ?? 0);
-$items = $data['items'] ?? [];
+$orderId        = (int)($data['orderId'] ?? 0);
+$orderDate      = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
+$clientName     = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
+$clientContact  = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
+$discount       = round((float)($data['discount'] ?? 0), 2);
+$paid           = round((float)($data['paid'] ?? 0), 2);
+$paymentType    = (int)($data['paymentType'] ?? 0);
+$paymentStatus  = (int)($data['paymentStatus'] ?? 0);
+$items          = $data['items'] ?? [];
 
 // Enforce open cash register for all commercial/business operations across all branches
 $openSession = sb_get_open_cash_session($connect, $branchId);
 if (!$openSession) {
-    send_http_error(400, 'Para modificar órdenes u operaciones comerciales, la caja registradora de la sucursal debe estar abierta. Por favor, abre un turno de caja antes de continuar.');
+    $activeBranch = get_active_branch($connect);
+    $bName = $activeBranch['branch_name'] ?? 'esta sucursal';
+    send_http_error(400, "Para modificar órdenes en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
 }
 
 if ($orderId <= 0 || $discount < 0 || $paid < 0 || !in_array($paymentType, [1, 2, 3], true) || !in_array($paymentStatus, [1, 2, 3], true) || !is_array($items) || count($items) === 0) {
@@ -55,8 +57,8 @@ try {
 
     $restoreStmt = $connect->prepare('UPDATE product SET quantity = CAST(CAST(quantity AS SIGNED) + ? AS CHAR) WHERE product_id = ? AND branch_id = ?');
     while ($oldItem = $oldRes->fetch_assoc()) {
-        $oldQty = (int)$oldItem['quantity'];
-        $oldProdId = (int)$oldItem['product_id'];
+        $oldQty     = (int)$oldItem['quantity'];
+        $oldProdId  = (int)$oldItem['product_id'];
         if ($oldProdId > 0 && $oldQty > 0) {
             $restoreStmt->bind_param('iii', $oldQty, $oldProdId, $branchId);
             $restoreStmt->execute();
@@ -81,9 +83,9 @@ try {
         if (!is_array($item)) {
             throw new InvalidArgumentException('Formato de fila de producto inválido.');
         }
-        $productId = (int)($item['productId'] ?? $item['product_id'] ?? 0);
-        $qty = (int)($item['quantity'] ?? 0);
-        $isCustom = !empty($item['isCustom']) || !empty($item['is_custom']) || $productId === 0;
+        $productId  = (int)($item['productId'] ?? $item['product_id'] ?? 0);
+        $qty        = (int)($item['quantity'] ?? 0);
+        $isCustom   = !empty($item['isCustom']) || !empty($item['is_custom']) || $productId === 0;
 
         if ($qty <= 0) {
             throw new InvalidArgumentException('Cada producto debe tener una cantidad mayor a 0.');
@@ -120,9 +122,9 @@ try {
                 throw new InvalidArgumentException("Stock insuficiente para {$product['product_name']} (disponible: {$currentStock}).");
             }
 
-            $rate = round((float)$product['rate'], 2);
-            $lineTotal = round($rate * $qty, 2);
-            $subTotal += $lineTotal;
+            $rate       = round((float)$product['rate'], 2);
+            $lineTotal  = round($rate * $qty, 2);
+            $subTotal   += $lineTotal;
 
             $newStock = (string)($currentStock - $qty);
             $updProdStmt->bind_param('sii', $newStock, $productId, $branchId);
@@ -141,19 +143,19 @@ try {
     $prodStmt->close();
     $updProdStmt->close();
 
-    $subTotal = round($subTotal, 2);
-    $vat = round($subTotal * ($taxRatePercent / 100), 2);
-    $totalAmount = round($subTotal + $vat, 2);
-    $grandTotal = round(max(0, $totalAmount - $discount), 2);
-    $due = round(max(0, $grandTotal - $paid), 2);
+    $subTotal       = round($subTotal, 2);
+    $vat            = round($subTotal * ($taxRatePercent / 100), 2);
+    $totalAmount    = round($subTotal + $vat, 2);
+    $grandTotal     = round(max(0, $totalAmount - $discount), 2);
+    $due            = round(max(0, $grandTotal - $paid), 2);
 
-    $subTotalStr = number_format($subTotal, 2, '.', '');
-    $vatStr = number_format($vat, 2, '.', '');
+    $subTotalStr    = number_format($subTotal, 2, '.', '');
+    $vatStr         = number_format($vat, 2, '.', '');
     $totalAmountStr = number_format($totalAmount, 2, '.', '');
-    $discountStr = number_format($discount, 2, '.', '');
-    $grandTotalStr = number_format($grandTotal, 2, '.', '');
-    $paidStr = number_format($paid, 2, '.', '');
-    $dueStr = number_format($due, 2, '.', '');
+    $discountStr    = number_format($discount, 2, '.', '');
+    $grandTotalStr  = number_format($grandTotal, 2, '.', '');
+    $paidStr        = number_format($paid, 2, '.', '');
+    $dueStr         = number_format($due, 2, '.', '');
 
     $orderStmt = $connect->prepare('UPDATE orders SET order_date = ?, client_name = ?, client_contact = ?, sub_total = ?, vat = ?, total_amount = ?, discount = ?, grand_total = ?, paid = ?, due = ?, payment_type = ?, payment_status = ?, order_status = 1 WHERE order_id = ? AND branch_id = ?');
     $orderStmt->bind_param(

@@ -8,7 +8,9 @@ $branchId   = get_active_branch_id($connect);
 // Enforce open cash register for all commercial operations across all branches
 $openSession = sb_get_open_cash_session($connect, $branchId);
 if (!$openSession) {
-    send_http_error(400, 'Para registrar cobros o pagos de préstamos, la caja registradora de la sucursal debe estar abierta. Por favor, abre un turno de caja antes de continuar.');
+    $activeBranch = get_active_branch($connect);
+    $bName = $activeBranch['branch_name'] ?? 'esta sucursal';
+    send_http_error(400, "Para registrar abonos o pagos en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
 }
 
 $data       = get_request_data();

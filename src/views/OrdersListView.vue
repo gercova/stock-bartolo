@@ -23,13 +23,14 @@
         </select>
       </div>
 
-      <RouterLink
-        to="/orders/create"
-        class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 shadow-xs transition shrink-0"
+      <button
+        type="button"
+        class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 shadow-xs transition shrink-0 cursor-pointer"
+        @click="goToCreateOrder"
       >
         <Plus class="h-4 w-4" />
         Agregar orden
-      </RouterLink>
+      </button>
     </div>
 
     <!-- Orders Content -->
@@ -277,13 +278,14 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { Search, Plus, Pencil, CreditCard, Printer, Trash2, Loader2 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrdersStore } from '@/stores/orders'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
+import { checkOpenCashSession, promptOpenCashRegister } from '@/utils/cashRegisterPrompt'
 import {
   formatCurrency,
   formatDate,
@@ -296,6 +298,7 @@ import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import OrderReceiptModal from '@/components/orders/OrderReceiptModal.vue'
 
+const router = useRouter()
 const auth = useAuthStore()
 const store = useOrdersStore()
 const ui = useUiStore()
@@ -315,6 +318,15 @@ const paymentForm = reactive({
   paymentStatus: 1,
 })
 
+async function goToCreateOrder() {
+  const cashStatus = await checkOpenCashSession()
+  if (!cashStatus.isOpen) {
+    await promptOpenCashRegister(router, auth.activeBranch?.branch_name || cashStatus.branchName, 'ventas y emisión de órdenes')
+    return
+  }
+  router.push('/orders/create')
+}
+
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
   return items.value.filter((o) => {
@@ -331,7 +343,12 @@ const filtered = computed(() => {
   })
 })
 
-function openPaymentModal(order) {
+async function openPaymentModal(order) {
+  const cashStatus = await checkOpenCashSession()
+  if (!cashStatus.isOpen) {
+    await promptOpenCashRegister(router, auth.activeBranch?.branch_name || cashStatus.branchName, 'cobros y pagos de órdenes')
+    return
+  }
   paymentTarget.value = order
   paymentForm.payAmount = order.due
   paymentForm.paymentType = order.payment_type || 2

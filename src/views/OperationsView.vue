@@ -31,13 +31,42 @@
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-xs transition"
+          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-xs transition cursor-pointer"
           @click="openNewOperationModal"
         >
           <Plus class="h-4 w-4" />
           Nueva Operación
         </button>
       </div>
+    </div>
+
+    <!-- Mandatory Open Cash Register Warning Banner (if cash register is closed) -->
+    <div
+      v-if="!checkingCashSession && !hasOpenCashSession"
+      class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-rose-300 bg-rose-50 p-4 sm:p-5 text-rose-900 shadow-xs"
+    >
+      <div class="flex items-start gap-3 min-w-0">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+          <AlertOctagon class="h-6 w-6" />
+        </div>
+        <div>
+          <h4 class="font-bold text-sm sm:text-base text-rose-950">
+            Caja Registradora Cerrada en esta Sucursal
+          </h4>
+          <p class="text-xs sm:text-sm text-rose-700 mt-0.5 leading-relaxed">
+            Para realizar operaciones comerciales de depósitos o retiros, la caja registradora de la sucursal debe estar abierta.
+            Por favor, abre un turno de caja para esta ubicación antes de registrar transacciones.
+          </p>
+        </div>
+      </div>
+
+      <RouterLink
+        to="/cash-register"
+        class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs sm:text-sm font-bold text-white hover:bg-rose-700 shadow-sm transition shrink-0"
+      >
+        <Calculator class="h-4 w-4" />
+        Abrir Turno de Caja →
+      </RouterLink>
     </div>
 
     <!-- Navigation Tabs -->
@@ -771,21 +800,42 @@ import {
   Package,
   Check,
   Store,
+  AlertOctagon,
+  Calculator,
 } from '@lucide/vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { useOperationsStore } from '@/stores/operations'
 import { useClientsStore } from '@/stores/clients'
+import { checkOpenCashSession, promptOpenCashRegister } from '@/utils/cashRegisterPrompt'
 
 import OperationModal from '@/components/operations/OperationModal.vue'
 import ReceiptTicketModal from '@/components/operations/ReceiptTicketModal.vue'
 import RedeemRewardModal from '@/components/operations/RedeemRewardModal.vue'
 import PointsHistoryModal from '@/components/operations/PointsHistoryModal.vue'
 
+const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 const store = useOperationsStore()
 const clientsStore = useClientsStore()
+
+// Cash Session State
+const hasOpenCashSession = ref(true)
+const checkingCashSession = ref(true)
+
+async function verifyCashSession() {
+  checkingCashSession.value = true
+  try {
+    const status = await checkOpenCashSession()
+    hasOpenCashSession.value = status.isOpen
+  } catch {
+    hasOpenCashSession.value = false
+  } finally {
+    checkingCashSession.value = false
+  }
+}
 
 const activeTab = ref('operations')
 const rankingSearch = ref('')
@@ -854,7 +904,15 @@ function resetFilters() {
   store.fetchOperations()
 }
 
-function openNewOperationModal() {
+async function openNewOperationModal() {
+  const cashStatus = await checkOpenCashSession()
+  hasOpenCashSession.value = cashStatus.isOpen
+
+  if (!cashStatus.isOpen) {
+    await promptOpenCashRegister(router, auth.activeBranch?.branch_name || cashStatus.branchName, 'depósitos y retiros')
+    return
+  }
+
   showOperationModal.value = true
 }
 
@@ -945,6 +1003,7 @@ function openHistoryModal(client) {
 }
 
 onMounted(() => {
+  verifyCashSession()
   store.fetchOperations()
   clientsStore.fetchClients()
 })

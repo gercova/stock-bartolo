@@ -98,10 +98,10 @@
           </div>
         </div>
 
-        <!-- Customer Search Row: Select2 Input + Green Plus Button (Matches Screenshot) -->
-        <div class="space-y-1">
+        <!-- Customer Search & Details Block (Matches exact reference screenshot) -->
+        <div class="space-y-1 max-w-2xl">
           <label class="block text-xs font-semibold text-[#1f6497]">Cliente:</label>
-          <div class="flex items-center gap-2 max-w-2xl">
+          <div class="flex items-center gap-2">
             <!-- Custom Select2 Client Component (Zero NPM dependencies) -->
             <div class="flex-1">
               <CustomSelect2Client
@@ -116,95 +116,19 @@
             <!-- Green Plus Button to Open RENIEC / SUNAT Lookup Modal (Matches Screenshot) -->
             <button
               type="button"
-              class="h-8 w-8 flex items-center justify-center rounded-md bg-[#00a65a] hover:bg-[#008d4c] text-white active:scale-95 transition shadow-xs shrink-0"
+              class="h-[34px] w-[34px] flex items-center justify-center rounded-[4px] bg-[#00a65a] hover:bg-[#008d4c] text-white active:scale-95 transition shadow-xs shrink-0 cursor-pointer"
               title="Consultar cliente por DNI/RUC ante RENIEC / SUNAT"
               @click="openReniecModal = true"
             >
               <Plus class="h-4 w-4 stroke-[3]" />
             </button>
           </div>
-        </div>
 
-        <!-- Selected Customer Details (Exact visual match from Screenshot) -->
-        <div
-          v-if="selectedClientObj"
-          class="pt-1 text-xs text-slate-800 space-y-1 max-w-2xl"
-        >
-          <!-- Row 1: Document Type & Number -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              {{ (selectedClientObj.document_type === 'OTRO' ? 'OTROS' : (selectedClientObj.document_type || 'OTROS')).toUpperCase() }}:
-            </span>
-            <span class="font-extrabold text-slate-900">
-              {{ selectedClientObj.document_number || '88888888' }}
-            </span>
-          </div>
-
-          <!-- Row 2: Customer Name -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              Cliente:
-            </span>
-            <span class="font-normal text-slate-800">
-              {{ selectedClientObj.name }}
-            </span>
-          </div>
-
-          <!-- Row 3: Birthdate and Age -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              F. Nac.:
-            </span>
-            <div class="flex items-baseline gap-10">
-              <span class="text-slate-800">
-                {{ selectedClientObj.birth_date || '0000-00-00' }}
-              </span>
-              <div class="flex items-baseline gap-2">
-                <span class="font-medium text-[#1f6497]">Edad:</span>
-                <span class="text-slate-800">{{ calculateAge(selectedClientObj.birth_date) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Row 4: Gender -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              Sexo:
-            </span>
-            <span class="text-slate-800">
-              {{ selectedClientObj.gender || '' }}
-            </span>
-          </div>
-
-          <!-- Row 5: Email -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              Correo:
-            </span>
-            <span class="text-slate-800">
-              {{ selectedClientObj.email || '' }}
-            </span>
-          </div>
-
-          <!-- Row 6: Address -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              Dirección:
-            </span>
-            <span class="text-slate-800">
-              {{ selectedClientObj.address || '' }}
-            </span>
-          </div>
-
-          <!-- Row 7: Phone / Mobile -->
-          <div class="flex items-baseline">
-            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
-              Teléfono/Cel:
-            </span>
-            <span class="text-slate-800">
-              {{ selectedClientObj.phone || '/' }}
-            </span>
-          </div>
+          <!-- Selected Customer Details (Exact visual match from Screenshot) -->
+          <ClientDetailDisplay
+            :client="selectedClientObj"
+            :divider="true"
+          />
         </div>
       </div>
 
@@ -549,8 +473,10 @@ import { useUiStore } from '@/stores/ui'
 import apiClient, { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
 import { findUnsafeField, sanitizeInput } from '@/utils/security'
+import { checkOpenCashSession, promptOpenCashRegister } from '@/utils/cashRegisterPrompt'
 import CustomSelect2Client from '@/components/common/CustomSelect2Client.vue'
 import CustomSelect2Product from '@/components/common/CustomSelect2Product.vue'
+import ClientDetailDisplay from '@/components/common/ClientDetailDisplay.vue'
 import OrderClientLookupModal from '@/components/orders/OrderClientLookupModal.vue'
 import OrderReceiptModal from '@/components/orders/OrderReceiptModal.vue'
 
@@ -836,6 +762,12 @@ async function submitOrder() {
     return
   }
 
+  // Enforce open cash register for all commercial operations / sales
+  if (!hasOpenCashSession.value) {
+    await promptOpenCashRegister(router, auth.activeBranch?.branch_name, 'ventas y emisión de órdenes')
+    return
+  }
+
   saving.value = true
   try {
     const payload = {
@@ -889,13 +821,14 @@ function onReceiptModalClose() {
   router.push('/orders')
 }
 
-async function verifyCashSession() {
+async function verifyCashSession(shouldPrompt = false) {
   checkingCashSession.value = true
   try {
-    const { data } = await apiClient.get('/fetchCashSessions.php')
-    openCashSession.value = (data?.openSessions && data.openSessions.length > 0)
-      ? data.openSessions[0]
-      : (data?.active_session || null)
+    const res = await checkOpenCashSession()
+    openCashSession.value = res.session
+    if (!res.isOpen && shouldPrompt) {
+      await promptOpenCashRegister(router, auth.activeBranch?.branch_name || res.branchName, 'ventas y emisión de órdenes')
+    }
   } catch {
     openCashSession.value = null
   } finally {
@@ -906,7 +839,7 @@ async function verifyCashSession() {
 onMounted(async () => {
   loadingInitial.value = true
   try {
-    await verifyCashSession()
+    await verifyCashSession(true)
     await store.fetchAvailableProducts(isEdit.value)
 
     if (isEdit.value) {
