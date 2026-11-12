@@ -339,6 +339,7 @@ import {
   Users,
   ShieldCheck,
   ArrowLeftRight,
+  PieChart,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -364,6 +365,7 @@ const navGroups = [
     label: 'Principal',
     items: [
       { label: 'Inicio', to: '/dashboard', icon: LayoutDashboard, match: ['/dashboard'] },
+      { label: 'Analítica General', to: '/analytics', icon: PieChart, match: ['/analytics'], badge: 'Gráficos' },
     ],
   },
   {

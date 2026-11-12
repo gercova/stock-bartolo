@@ -1,7 +1,7 @@
 # PDR — Preliminary Design Review & Auditoría Técnica
 
-**Proyecto:** Stock Bartolo — Sistema Multi-Sucursal de Inventario, Ventas (POS), Caja y Préstamos  
-**Versión:** `2.4.0` (SPA Vue 3 + Pinia + Multi-Tenant + Caja General + Seguridad RBAC + Clientes Decolecta + Operaciones y Fidelización)  
+**Proyecto:** Stock Bartolo — Sistema Multi-Sucursal de Inventario, Ventas (POS), Caja, Préstamos y Analítica  
+**Versión:** `2.5.0` (SPA Vue 3 + Pinia + Multi-Tenant + Caja General + Seguridad RBAC + Clientes Decolecta + Operaciones y Fidelización + Dashboard Analítico con Chart.js)  
 **Fecha:** 11 de noviembre de 2026
 
 ---
@@ -28,6 +28,7 @@ Este documento presenta la arquitectura técnica, el modelo relacional multi-suc
 | **OBJ-12** | Módulo **Clientes y Proveedores** (CRUD, Integración Decolecta RENIEC/SUNAT y Borrado Lógico *Soft Deletes*) | Completado | [ClientsView.vue](src/views/ClientsView.vue), [ClientModal.vue](src/components/clients/ClientModal.vue), [clients.js](src/stores/clients.js), `php_action/*Client*.php`, `lookupDocument.php` |
 | **OBJ-13** | Conexión de Base de Datos e Integraciones Seguras vía `.env` sin credenciales expuestas | Completado | [.env](.env), [.env.example](.env.example), [env.php](php_action/env.php), [db_connect.php](php_action/db_connect.php) |
 | **OBJ-14** | Módulo **Operaciones y Fidelización** (Depósitos y Retiros dependientes de Caja General, Comisión de 1 sol por cada 100 soles, Checkbox comisión incluida, Programa de Puntos, Catálogo de Premios con reinicio de saldo y preservación inmutable del ranking, y Modal SweetAlert2 con Ticket Térmico de Doble Impresión) | Completado | [OperationsView.vue](src/views/OperationsView.vue), [operations.js](src/stores/operations.js), `src/components/operations/*`, `php_action/*Operation*.php`, `fetchLoyaltyRanking.php`, `fetchRewards.php`, `redeemReward.php`, `printOperationReceipt.php` |
+| **OBJ-15** | **Dashboard General y Analítica de Negocio con Gráficos Interactivos (Chart.js)**: barras agrupadas de depósitos y retiros por mes y año, gráfico circular por tipo de operación, gráfico de dona para actividad de sucursales, gráfico de dona para clientes con más puntos acumulados, barras horizontales de clientes más frecuentes, tarjetas KPI ejecutivas y filtros dinámicos por año y sucursal | Completado | [DashboardView.vue](src/views/DashboardView.vue), [BusinessAnalytics.vue](src/components/dashboard/BusinessAnalytics.vue), [dashboard.js](src/stores/dashboard.js), [fetchBusinessAnalytics.php](php_action/fetchBusinessAnalytics.php) |
 
 ---
 
@@ -401,8 +402,8 @@ Todas las pruebas se ejecutaron directamente contra el entorno real (**PHP 8.3**
 
 | Verificación | Alcance | Resultado |
 | :--- | :--- | :--- |
-| **Sintaxis PHP (`php -l`)** | Los `81` archivos en `php_action/*.php` | **81/81 aprobados (0 errores)** |
+| **Sintaxis PHP (`php -l`)** | Los `82` archivos en `php_action/*.php` | **82/82 aprobados (0 errores)** |
 | **Esquema y Migración** | `pos_stock.sql` y `ensure_app_schema($connect)` en MariaDB `pos_stock` | **25/25 tablas verificadas** con datos iniciales limpios en `SUC-001`, `CAJA-01`, catálogo de premios y roles |
-| **Compilación SPA (`npm run build`)** | Bundle Vite + Vue 3 + Tailwind CSS v4 | **Exitoso** (`2204` módulos compilados sin errores) |
+| **Compilación SPA (`npm run build`)** | Bundle Vite + Vue 3 + Tailwind CSS v4 + Chart.js | **Exitoso** (`2209` módulos compilados sin errores) |
 | **Suite Automatizada API, Multi-Tenant, Fidelización & Seguridad** | Auth `401`, CSRF `403`, políticas de caja, depósitos y retiros con comisión (1/100), bloqueo atómico `FOR UPDATE` en Caja General, rechazo por saldo insuficiente (`400`), acumulación de puntos, leaderboard por `lifetime_points DESC`, canje de premios con reset de saldo y preservación inmutable del ranking, Decolecta DNI/RUC, y borrado lógico (*soft deletes*) | **Aprobado al 100%** |
-| **Auditoría Visual y Funcional E2E en Navegador (Playwright)** | Login `admin`, `/operations` (3 pestañas: Operaciones, Ranking, Catálogo de Premios), modal de nueva operación con cálculo de comisión en vivo y checkbox "comisión incluida", modal SweetAlert2 tras registro exitoso, visor de ticket térmico 80mm con opción de doble impresión (Copia Cliente + Copia Empresa), podio de clasificación de clientes, visor de movimientos de puntos y catálogo de recompensas | **0 errores de consola**, **0 peticiones fallidas (`200`/`201`)** |
+| **Auditoría Visual y Funcional E2E en Navegador (Playwright)** | Login `admin`, `/dashboard` y `/analytics`: verificación de los 5 gráficos interactivos Chart.js (barras agrupadas mensuales, circular de valor por tipo de operación, donas de actividad de sucursales y puntos de clientes, barras horizontales de clientes más frecuentes), cambio dinámico de año y sucursal, alternancia fluida de pestañas en tabla de clientes destacados y navegación cruzada | **0 errores de consola**, **0 peticiones fallidas (`200`/`201`)** |

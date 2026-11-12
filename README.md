@@ -1,6 +1,6 @@
-# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja, Operaciones, Fidelización, Clientes y Seguridad
+# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja, Operaciones, Fidelización, Clientes, Seguridad y Analítica del Negocio
 
-Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, **Módulo de Operaciones (Depósitos y Retiros con comisión de 1 sol por cada 100 soles)**, **Programa de Fidelización de Clientes con acumulación de puntos, catálogo de premios y ranking histórico inmutable**, reportes, **gestión de préstamos a clientes con interés opcional**, **Padrón de Clientes y Proveedores con consulta en tiempo real RENIEC/SUNAT (Decolecta) y borrado lógico (*soft delete*)**, y **Gestión Integral de Seguridad con control de acceso basado en roles (RBAC), matriz de 16 módulos y registro inmutable de auditoría**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** (`81` endpoints/módulos) y base de datos **MySQL / MariaDB** (`25` tablas) con variables de entorno protegidas vía `.env` y endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
+Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, **Módulo de Operaciones (Depósitos y Retiros con comisión de 1 sol por cada 100 soles)**, **Programa de Fidelización de Clientes con acumulación de puntos, catálogo de premios y ranking histórico inmutable**, **Dashboard General y Analítica de Negocio con gráficos interactivos (Chart.js)**, reportes, **gestión de préstamos a clientes con interés opcional**, **Padrón de Clientes y Proveedores con consulta en tiempo real RENIEC/SUNAT (Decolecta) y borrado lógico (*soft delete*)**, y **Gestión Integral de Seguridad con control de acceso basado en roles (RBAC), matriz de 16 módulos y registro inmutable de auditoría**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4 + Chart.js**, respaldada por una API REST JSON en **PHP 8** (`82` endpoints/módulos) y base de datos **MySQL / MariaDB** (`25` tablas) con variables de entorno protegidas vía `.env` y endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
 
 ---
 
@@ -97,13 +97,24 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
     - **Línea de corte**: `--- ✂ CORTAR AQUÍ ✂ ---`.
     - **Copia Empresa / Caja**: copia idéntica con espacio para firma del cliente.
 
-### 8. Gestión de Inventario, Órdenes y Reportes
+### 8. Dashboard General y Analítica de Negocio con Gráficos Interactivos (`/dashboard`, `/analytics`)
+- **Disponible para todos los usuarios del sistema** con pestaña dedicada y acceso directo desde el menú lateral:
+  - **Filtros Dinámicos**: Selector de año y selector de sucursal (modo consolidado *"Todas las sucursales"* o sucursal específica).
+  - **Tarjetas KPI Ejecutivas**: Volumen total procesado, total depósitos, total retiros, flujo neto (+/-), comisiones recaudadas (1%) y puntos otorgados.
+  - **Gráfico de Barras Agrupadas**: Comparativa mensual (12 meses) de montos (S/) ingresados por depósitos versus dispensados por retiros para el año seleccionado.
+  - **Gráfico Circular (Pie Chart)**: Distribución del valor monetario procesado por tipo de operación (Depósitos vs Retiros) con porcentajes y montos exactos.
+  - **Gráfico de Dona (Donut Chart) - Actividad de Sucursales**: Sucursales con mayor actividad operativa y porcentaje de participación en el volumen total.
+  - **Gráfico de Dona (Donut Chart) - Clientes con Mayor Puntuación**: Top clientes con mayor puntuación acumulada de fidelización (`lifetime_points`).
+  - **Gráfico de Barras Horizontales - Clientes Más Frecuentes**: Ranking de clientes con mayor número de operaciones, discriminando depósitos y retiros.
+  - **Tabla Clasificatoria (Leaderboard)**: Tabla interactiva con pestañas para ordenar por *"Mayor Volumen (S/)"*, *"Más Frecuentes"* y *"Mayor Puntuación"*.
+
+### 9. Gestión de Inventario, Órdenes y Reportes
 - **Fabricantes (`/brands`)** y **Categorías (`/categories`)**: CRUD por sucursal con búsqueda, filtros y borrado lógico.
 - **Productos (`/products`)**: CRUD por sucursal con carga segura de imágenes (`editProductImage.php`) y alertas de stock bajo (`<= 3` unidades).
 - **Órdenes / POS (`/orders`, `/orders/create`, `/orders/:id/edit`)**: cálculo con tasa de IVA y símbolo de moneda de la sucursal activa, control transaccional de stock (`FOR UPDATE`), verificación de caja abierta cuando `enforce_open_till_for_cash` está activo y ticket imprimible con cabecera de sucursal.
 - **Reportes (`/reports`)**: Consolidado imprimible por rango de fechas dentro de la sucursal activa cruzando órdenes y préstamos.
 
-### 8. Páginas de Error HTTP (`400`–`504`) y SPA Pura
+### 10. Páginas de Error HTTP (`400`–`504`) y SPA Pura
 - Manejador centralizado en SPA ([ErrorView.vue](src/views/ErrorView.vue), [httpErrors.js](src/constants/httpErrors.js)) y Apache ([http_error.php](php_action/http_error.php), [error.php](php_action/error.php), [.htaccess](.htaccess)) cubriendo **`400`, `401`, `403`, `404`, `405`, `408`, `422`, `429`, `500`, `501`, `502`, `503`, `504`**.
 
 ---
@@ -116,7 +127,9 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
 | **Estado Global** | Pinia | `^4.1.0` |
 | **Enrutamiento SPA** | Vue Router | `^5.5.0` |
 | **Estilos UI** | Tailwind CSS + `@tailwindcss/vite` | `^4.3.5` |
+| **Visualización y Gráficos** | Chart.js | `^4.5.1` |
 | **Cliente HTTP** | Axios (CSRF + manejo HTTP Errors) | `^1.21.1` |
+| **Alertas Interactivas** | SweetAlert2 | `^11.17.2` |
 | **Iconografía** | `@lucide/vue` | `^1.0.0` |
 | **Bundler** | Vite + `@vitejs/plugin-vue` | `^8.3.7` / `^6.0.10` |
 | **Backend API** | PHP (API JSON + Sesiones + `mysqli`) | PHP 8.1+ (probado en 8.3) |
@@ -255,7 +268,8 @@ Vite verifica al iniciar si ya existe un servidor escuchando en `VITE_API_TARGET
 | Ruta | Vista | Acceso | Descripción |
 | :--- | :--- | :--- | :--- |
 | `/login` | `LoginView.vue` | Invitados (`guestOnly`) | Inicio de sesión con CSRF y bloqueo por intentos fallidos |
-| `/dashboard` | `DashboardView.vue` | Autenticado | KPIs de la sucursal activa, estado de `Caja General` y `Caja Registradora` |
+| `/dashboard` | `DashboardView.vue` | Autenticado | KPIs de la sucursal activa, estado de `Caja General` y `Caja Registradora` (pestaña Resumen) |
+| `/analytics` | `DashboardView.vue` | Autenticado | **Reportes y Analítica del Negocio con gráficos interactivos (Chart.js)**: barras, pastel, donas, filtros por año y sucursal, y ranking |
 | `/brands` | `BrandsView.vue` | Autenticado | Fabricantes de la sucursal activa |
 | `/categories` | `CategoriesView.vue` | Autenticado | Categorías de la sucursal activa |
 | `/products` | `ProductsView.vue` | Autenticado | Catálogo de productos e imágenes de la sucursal activa |
@@ -284,6 +298,7 @@ Todas las rutas mutantes (`POST`, `PUT`, `DELETE`) exigen sesión autenticada (s
 | | `/php_action/login.php` | `POST` | Autentica, inicializa sucursal activa, aplica rate limiting (`429`) y rota CSRF |
 | | `/php_action/logout.php` | `POST` | Destruye sesión y cookies |
 | **Dashboard / Config.** | `/php_action/fetchDashboard.php` | `GET` | KPIs multi-sucursal + saldos en vivo de `Caja General` y turno abierto |
+| | `/php_action/fetchBusinessAnalytics.php` | `GET` | **Métricas consolidadas de negocio**: series mensuales depósitos/retiros, montos por tipo de operación, top clientes (volumen, frecuencia, puntos) y actividad de sucursales |
 | | `/php_action/fetchSystemConfig.php` | `GET` | Devuelve parámetros globales, sucursal activa y estadísticas |
 | | `/php_action/saveSystemConfig.php` | `POST`/`PUT` | Actualiza identidad corporativa, defaults fiscales y políticas de caja |
 | **Sucursales** | `/php_action/fetchBranches.php` | `GET` | Lista sucursales con saldos de Caja General, cajas abiertas y conteos |

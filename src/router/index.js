@@ -56,6 +56,13 @@ const routes = [
         meta: { title: 'Inicio', breadcrumb: ['Inicio'] },
       },
       {
+        path: 'analytics',
+        name: 'analytics',
+        component: DashboardView,
+        props: { initialTab: 'analytics' },
+        meta: { title: 'Reportes y Analítica del Negocio', breadcrumb: ['Inicio', 'Analítica del Negocio'] },
+      },
+      {
         path: 'brands',
         name: 'brands',
         component: BrandsView,

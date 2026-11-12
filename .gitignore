@@ -24,3 +24,4 @@ yarn-error.log
 /storage/framework/views/*
 /storage/logs/*
 /bootstrap/cache/*
+.playwright-mcp/
