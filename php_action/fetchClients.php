@@ -5,27 +5,27 @@ require_method(['GET']);
 
 sb_assert_permission($connect, 'clients', 'access');
 
-$search = trim((string)($_GET['search'] ?? ''));
+$search     = trim((string)($_GET['search'] ?? ''));
 $clientType = trim((string)($_GET['client_type'] ?? ''));
-$docType = trim((string)($_GET['document_type'] ?? ''));
-$status = isset($_GET['status']) && $_GET['status'] !== '' ? (int)$_GET['status'] : null;
-$branchId = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
+$docType    = trim((string)($_GET['document_type'] ?? ''));
+$status     = isset($_GET['status']) && $_GET['status'] !== '' ? (int)$_GET['status'] : null;
+$branchId   = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
 
 // Mandatory soft delete filter: only records with record_status = 1 are active
-$where = ['c.record_status = 1'];
+$where  = ['c.record_status = 1'];
 $params = [];
-$types = '';
+$types  = '';
 
 if ($search !== '') {
-    $where[] = '(c.name LIKE ? OR c.document_number LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?)';
-    $like = '%' . $search . '%';
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $types .= 'ssssss';
+    $where[]    = '(c.name LIKE ? OR c.document_number LIKE ? OR c.email LIKE ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?)';
+    $like       = '%' . $search . '%';
+    $params[]   = $like;
+    $params[]   = $like;
+    $params[]   = $like;
+    $params[]   = $like;
+    $params[]   = $like;
+    $params[]   = $like;
+    $types      .= 'ssssss';
 }
 
 if ($clientType !== '' && $clientType !== 'all') {
@@ -41,26 +41,25 @@ if ($clientType !== '' && $clientType !== 'all') {
 }
 
 if ($docType !== '' && $docType !== 'all') {
-    $where[] = 'c.document_type = ?';
-    $params[] = $docType;
-    $types .= 's';
+    $where[]    = 'c.document_type = ?';
+    $params[]   = $docType;
+    $types      .= 's';
 }
 
 if ($status !== null && in_array($status, [0, 1], true)) {
-    $where[] = 'c.status = ?';
-    $params[] = $status;
-    $types .= 'i';
+    $where[]    = 'c.status = ?';
+    $params[]   = $status;
+    $types      .= 'i';
 }
 
 if ($branchId !== null && $branchId > 0) {
-    $where[] = '(c.branch_id = ? OR c.branch_id IS NULL)';
-    $params[] = $branchId;
-    $types .= 'i';
+    $where[]    = '(c.branch_id = ? OR c.branch_id IS NULL)';
+    $params[]   = $branchId;
+    $types      .= 'i';
 }
 
-$whereSql = implode(' AND ', $where);
-
-$sql = "SELECT 
+$whereSql   = implode(' AND ', $where);
+$sql        = "SELECT 
             c.client_id,
             c.branch_id,
             c.document_type,
@@ -98,27 +97,27 @@ $res = $stmt->get_result();
 $clients = [];
 while ($row = $res->fetch_assoc()) {
     $clients[] = [
-        'client_id' => (int)$row['client_id'],
-        'branch_id' => $row['branch_id'] ? (int)$row['branch_id'] : null,
-        'branch_name' => (string)($row['branch_name'] ?? 'Acceso Global'),
-        'branch_code' => (string)($row['branch_code'] ?? 'GLOBAL'),
-        'document_type' => (string)$row['document_type'],
-        'document_number' => (string)$row['document_number'],
-        'name' => (string)$row['name'],
-        'first_name' => (string)($row['first_name'] ?? ''),
-        'last_name' => (string)($row['last_name'] ?? ''),
-        'email' => (string)($row['email'] ?? ''),
-        'phone' => (string)($row['phone'] ?? ''),
-        'address' => (string)($row['address'] ?? ''),
-        'department' => (string)($row['department'] ?? ''),
-        'province' => (string)($row['province'] ?? ''),
-        'district' => (string)($row['district'] ?? ''),
-        'ubigeo' => (string)($row['ubigeo'] ?? ''),
-        'client_type' => (string)$row['client_type'],
-        'status' => (int)$row['status'],
-        'notes' => (string)($row['notes'] ?? ''),
-        'created_at' => $row['created_at'],
-        'updated_at' => $row['updated_at'],
+        'client_id'         => (int)$row['client_id'],
+        'branch_id'         => $row['branch_id'] ? (int)$row['branch_id'] : null,
+        'branch_name'       => (string)($row['branch_name'] ?? 'Acceso Global'),
+        'branch_code'       => (string)($row['branch_code'] ?? 'GLOBAL'),
+        'document_type'     => (string)$row['document_type'],
+        'document_number'   => (string)$row['document_number'],
+        'name'              => (string)$row['name'],
+        'first_name'        => (string)($row['first_name'] ?? ''),
+        'last_name'         => (string)($row['last_name'] ?? ''),
+        'email'             => (string)($row['email'] ?? ''),
+        'phone'             => (string)($row['phone'] ?? ''),
+        'address'           => (string)($row['address'] ?? ''),
+        'department'        => (string)($row['department'] ?? ''),
+        'province'          => (string)($row['province'] ?? ''),
+        'district'          => (string)($row['district'] ?? ''),
+        'ubigeo'            => (string)($row['ubigeo'] ?? ''),
+        'client_type'       => (string)$row['client_type'],
+        'status'            => (int)$row['status'],
+        'notes'             => (string)($row['notes'] ?? ''),
+        'created_at'        => $row['created_at'],
+        'updated_at'        => $row['updated_at'],
     ];
 }
 $stmt->close();
@@ -135,18 +134,18 @@ $sRes = $connect->query($statsQuery);
 $sRow = $sRes ? $sRes->fetch_assoc() : [];
 
 $stats = [
-    'total' => (int)($sRow['total'] ?? count($clients)),
-    'clients_count' => (int)($sRow['clients_count'] ?? 0),
-    'suppliers_count' => (int)($sRow['suppliers_count'] ?? 0),
-    'active_count' => (int)($sRow['active_count'] ?? 0),
-    'inactive_count' => (int)($sRow['inactive_count'] ?? 0),
+    'total'             => (int)($sRow['total'] ?? count($clients)),
+    'clients_count'     => (int)($sRow['clients_count'] ?? 0),
+    'suppliers_count'   => (int)($sRow['suppliers_count'] ?? 0),
+    'active_count'      => (int)($sRow['active_count'] ?? 0),
+    'inactive_count'    => (int)($sRow['inactive_count'] ?? 0),
 ];
 
 $connect->close();
 
 json_response([
-    'success' => true,
-    'data' => $clients,
-    'stats' => $stats,
+    'success'   => true,
+    'data'      => $clients,
+    'stats'     => $stats,
 ]);
 

@@ -3,27 +3,27 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
 
-$branchId = get_active_branch_id($connect);
-$activeBranch = get_active_branch($connect);
+$branchId       = get_active_branch_id($connect);
+$activeBranch   = get_active_branch($connect);
 
 // Products summary
-$prodStmt = $connect->prepare('SELECT COUNT(*) AS cnt FROM product WHERE branch_id = ? AND status = 1');
+$prodStmt       = $connect->prepare('SELECT COUNT(*) AS cnt FROM product WHERE branch_id = ? AND status = 1');
 $prodStmt->bind_param('i', $branchId);
 $prodStmt->execute();
-$totalProducts = (int)($prodStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+$totalProducts  = (int)($prodStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
 $prodStmt->close();
 
-$lowStmt = $connect->prepare('SELECT product_id, product_name, quantity, rate FROM product WHERE branch_id = ? AND status = 1 AND CAST(quantity AS SIGNED) <= 3 ORDER BY CAST(quantity AS SIGNED) ASC LIMIT 10');
+$lowStmt    = $connect->prepare('SELECT product_id, product_name, quantity, rate FROM product WHERE branch_id = ? AND status = 1 AND CAST(quantity AS SIGNED) <= 3 ORDER BY CAST(quantity AS SIGNED) ASC LIMIT 10');
 $lowStmt->bind_param('i', $branchId);
 $lowStmt->execute();
-$lowRes = $lowStmt->get_result();
+$lowRes     = $lowStmt->get_result();
 $lowStockProducts = [];
 while ($row = $lowRes->fetch_assoc()) {
     $lowStockProducts[] = [
-        'product_id' => (int)$row['product_id'],
-        'product_name' => $row['product_name'],
-        'quantity' => (int)$row['quantity'],
-        'rate' => (float)$row['rate'],
+        'product_id'    => (int)$row['product_id'],
+        'product_name'  => $row['product_name'],
+        'quantity'      => (int)$row['quantity'],
+        'rate'          => (float)$row['rate'],
     ];
 }
 $lowStmt->close();

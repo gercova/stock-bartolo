@@ -465,6 +465,8 @@ CREATE TABLE IF NOT EXISTS `clients` (
   `ubigeo` varchar(10) DEFAULT NULL,
   `client_type` enum('client','supplier','both') NOT NULL DEFAULT 'client',
   `status` tinyint(1) NOT NULL DEFAULT 1,
+  `points_balance` int(11) NOT NULL DEFAULT 0,
+  `lifetime_points` int(11) NOT NULL DEFAULT 0,
   `record_status` tinyint(1) NOT NULL DEFAULT 1,
   `notes` text DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -475,6 +477,87 @@ CREATE TABLE IF NOT EXISTS `clients` (
   KEY `idx_clients_document` (`document_type`, `document_number`),
   KEY `idx_clients_record_status` (`record_status`),
   KEY `idx_clients_client_type` (`client_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `branch_operations` (
+  `operation_id` int(11) NOT NULL AUTO_INCREMENT,
+  `branch_id` int(11) NOT NULL,
+  `operation_code` varchar(32) NOT NULL,
+  `client_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `operation_type` enum('deposit','withdrawal') NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `commission_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `commission_included` tinyint(1) NOT NULL DEFAULT 0,
+  `net_amount` decimal(12,2) NOT NULL,
+  `total_customer_amount` decimal(12,2) NOT NULL,
+  `points_earned` int(11) NOT NULL DEFAULT 0,
+  `central_balance_before` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `central_balance_after` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `status` enum('completed','cancelled') NOT NULL DEFAULT 'completed',
+  `notes` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`operation_id`),
+  UNIQUE KEY `uniq_operation_code` (`operation_code`),
+  KEY `idx_ops_branch` (`branch_id`, `created_at`),
+  KEY `idx_ops_client` (`client_id`),
+  KEY `idx_ops_type` (`operation_type`),
+  KEY `idx_ops_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `client_points_history` (
+  `history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `client_id` int(11) NOT NULL,
+  `operation_id` int(11) DEFAULT NULL,
+  `redemption_id` int(11) DEFAULT NULL,
+  `type` enum('earned','redeemed','reset','adjusted') NOT NULL,
+  `points` int(11) NOT NULL,
+  `lifetime_after` int(11) NOT NULL DEFAULT 0,
+  `balance_after` int(11) NOT NULL DEFAULT 0,
+  `description` varchar(255) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`history_id`),
+  KEY `idx_pts_client` (`client_id`, `created_at`),
+  KEY `idx_pts_operation` (`operation_id`),
+  KEY `idx_pts_type` (`type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `reward_items` (
+  `reward_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `description` text DEFAULT NULL,
+  `category` varchar(60) NOT NULL DEFAULT 'general',
+  `points_cost` int(11) NOT NULL,
+  `price_soles` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `stock` int(11) NOT NULL DEFAULT 0,
+  `image` varchar(255) DEFAULT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT 1,
+  `record_status` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`reward_id`),
+  KEY `idx_rewards_status` (`record_status`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `reward_redemptions` (
+  `redemption_id` int(11) NOT NULL AUTO_INCREMENT,
+  `redemption_code` varchar(32) NOT NULL,
+  `branch_id` int(11) NOT NULL,
+  `client_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `reward_id` int(11) NOT NULL,
+  `points_spent` int(11) NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `points_balance_before` int(11) NOT NULL,
+  `points_balance_after` int(11) NOT NULL DEFAULT 0,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`redemption_id`),
+  UNIQUE KEY `uniq_redemption_code` (`redemption_code`),
+  KEY `idx_redemptions_branch` (`branch_id`),
+  KEY `idx_redemptions_client` (`client_id`),
+  KEY `idx_redemptions_reward` (`reward_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

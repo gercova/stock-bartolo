@@ -3,41 +3,40 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
-$branchId = get_active_branch_id($connect);
-$activeBranch = get_active_branch($connect);
-$userId = (int)$_SESSION['userId'];
-$data = get_request_data();
+$branchId       = get_active_branch_id($connect);
+$activeBranch   = get_active_branch($connect);
+$userId         = (int)$_SESSION['userId'];
+$data           = get_request_data();
 
-$orderDate = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
-$clientName = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
-$clientContact = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
-$discount = round((float)($data['discount'] ?? 0), 2);
-$paid = round((float)($data['paid'] ?? 0), 2);
-$paymentType = (int)($data['paymentType'] ?? 0);
-$paymentStatus = (int)($data['paymentStatus'] ?? 0);
-$items = $data['items'] ?? [];
+$orderDate      = validate_iso_date($data['orderDate'] ?? '', 'fecha de orden', true);
+$clientName     = sanitize_clean_text($data['clientName'] ?? '', 'nombre del cliente', 200, true);
+$clientContact  = sanitize_clean_text($data['clientContact'] ?? '', 'teléfono del cliente', 100, true);
+$discount       = round((float)($data['discount'] ?? 0), 2);
+$paid           = round((float)($data['paid'] ?? 0), 2);
+$paymentType    = (int)($data['paymentType'] ?? 0);
+$paymentStatus  = (int)($data['paymentStatus'] ?? 0);
+$items          = $data['items'] ?? [];
 
 if ($discount < 0 || $paid < 0 || !in_array($paymentType, [1, 2, 3], true) || !in_array($paymentStatus, [1, 2, 3], true) || !is_array($items) || count($items) === 0) {
     send_http_error(400, 'Completa todos los campos obligatorios con valores válidos y agrega al menos un producto.');
 }
 
 $taxRatePercent = (float)($activeBranch['tax_rate'] ?? 13.0);
-
 $connect->begin_transaction();
 
 try {
-    $subTotal = 0.0;
-    $resolvedItems = [];
+    $subTotal       = 0.0;
+    $resolvedItems  = [];
 
-    $prodStmt = $connect->prepare('SELECT product_id, product_name, quantity, rate FROM product WHERE product_id = ? AND branch_id = ? AND status = 1 FOR UPDATE');
-    $updProdStmt = $connect->prepare('UPDATE product SET quantity = ? WHERE product_id = ? AND branch_id = ?');
+    $prodStmt       = $connect->prepare('SELECT product_id, product_name, quantity, rate FROM product WHERE product_id = ? AND branch_id = ? AND status = 1 FOR UPDATE');
+    $updProdStmt    = $connect->prepare('UPDATE product SET quantity = ? WHERE product_id = ? AND branch_id = ?');
 
     foreach ($items as $item) {
         if (!is_array($item)) {
             throw new InvalidArgumentException('Formato de fila de producto inválido.');
         }
-        $productId = (int)($item['productId'] ?? $item['product_id'] ?? 0);
-        $qty = (int)($item['quantity'] ?? 0);
+        $productId  = (int)($item['productId'] ?? $item['product_id'] ?? 0);
+        $qty        = (int)($item['quantity'] ?? 0);
         if ($productId <= 0 || $qty <= 0) {
             throw new InvalidArgumentException('Cada fila debe tener un producto y cantidad mayor a 0.');
         }
@@ -56,40 +55,40 @@ try {
             throw new InvalidArgumentException("Stock insuficiente para {$product['product_name']} (disponible: {$currentStock}).");
         }
 
-        $rate = round((float)$product['rate'], 2);
-        $lineTotal = round($rate * $qty, 2);
-        $subTotal += $lineTotal;
+        $rate       = round((float)$product['rate'], 2);
+        $lineTotal  = round($rate * $qty, 2);
+        $subTotal   += $lineTotal;
 
-        $newStock = (string)($currentStock - $qty);
+        $newStock   = (string)($currentStock - $qty);
         $updProdStmt->bind_param('sii', $newStock, $productId, $branchId);
         $updProdStmt->execute();
 
         $resolvedItems[] = [
-            'product_id' => $productId,
-            'quantity' => (string)$qty,
-            'rate' => number_format($rate, 2, '.', ''),
-            'total' => number_format($lineTotal, 2, '.', ''),
+            'product_id'    => $productId,
+            'quantity'      => (string)$qty,
+            'rate'          => number_format($rate, 2, '.', ''),
+            'total'         => number_format($lineTotal, 2, '.', ''),
         ];
     }
 
     $prodStmt->close();
     $updProdStmt->close();
 
-    $subTotal = round($subTotal, 2);
-    $vat = round($subTotal * ($taxRatePercent / 100), 2);
-    $totalAmount = round($subTotal + $vat, 2);
-    $grandTotal = round(max(0, $totalAmount - $discount), 2);
-    $due = round(max(0, $grandTotal - $paid), 2);
+    $subTotal       = round($subTotal, 2);
+    $vat            = round($subTotal * ($taxRatePercent / 100), 2);
+    $totalAmount    = round($subTotal + $vat, 2);
+    $grandTotal     = round(max(0, $totalAmount - $discount), 2);
+    $due            = round(max(0, $grandTotal - $paid), 2);
 
-    $subTotalStr = number_format($subTotal, 2, '.', '');
-    $vatStr = number_format($vat, 2, '.', '');
+    $subTotalStr    = number_format($subTotal, 2, '.', '');
+    $vatStr         = number_format($vat, 2, '.', '');
     $totalAmountStr = number_format($totalAmount, 2, '.', '');
-    $discountStr = number_format($discount, 2, '.', '');
-    $grandTotalStr = number_format($grandTotal, 2, '.', '');
-    $paidStr = number_format($paid, 2, '.', '');
-    $dueStr = number_format($due, 2, '.', '');
+    $discountStr    = number_format($discount, 2, '.', '');
+    $grandTotalStr  = number_format($grandTotal, 2, '.', '');
+    $paidStr        = number_format($paid, 2, '.', '');
+    $dueStr         = number_format($due, 2, '.', '');
 
-    $orderStmt = $connect->prepare('INSERT INTO orders (branch_id, order_date, client_name, client_contact, sub_total, vat, total_amount, discount, grand_total, paid, due, payment_type, payment_status, order_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
+    $orderStmt      = $connect->prepare('INSERT INTO orders (branch_id, order_date, client_name, client_contact, sub_total, vat, total_amount, discount, grand_total, paid, due, payment_type, payment_status, order_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
     $orderStmt->bind_param(
         'issssssssssii',
         $branchId,

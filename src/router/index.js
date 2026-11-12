@@ -18,6 +18,7 @@ import CashRegisterView from '@/views/CashRegisterView.vue'
 import SystemConfigView from '@/views/SystemConfigView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import ClientsView from '@/views/ClientsView.vue'
+import OperationsView from '@/views/OperationsView.vue'
 import SecurityView from '@/views/SecurityView.vue'
 import ErrorView from '@/views/ErrorView.vue'
 
@@ -102,6 +103,12 @@ const routes = [
         name: 'clients',
         component: ClientsView,
         meta: { title: 'Clientes y Proveedores', breadcrumb: ['Inicio', 'Ventas y Finanzas', 'Clientes y Proveedores'] },
+      },
+      {
+        path: 'operations',
+        name: 'operations',
+        component: OperationsView,
+        meta: { title: 'Operaciones y Fidelización', breadcrumb: ['Inicio', 'Ventas y Finanzas', 'Operaciones'] },
       },
       {
         path: 'reports',

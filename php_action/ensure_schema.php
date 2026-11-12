@@ -5,6 +5,20 @@ function sb_column_exists(array $colsMap, string $table, string $column): bool
     return isset($colsMap[strtolower($table)][strtolower($column)]);
 }
 
+function sb_ensure_table_column(mysqli $connect, string $table, string $column, string $definition): void
+{
+    $chk = $connect->prepare("SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+    if ($chk) {
+        $chk->bind_param('ss', $table, $column);
+        $chk->execute();
+        $cnt = (int)($chk->get_result()->fetch_assoc()['c'] ?? 0);
+        $chk->close();
+        if ($cnt === 0) {
+            $connect->query("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+        }
+    }
+}
+
 function sb_load_columns_map(mysqli $connect): array
 {
     $map = [];
@@ -442,31 +456,31 @@ function ensure_app_schema(mysqli $connect): void
         $rolePermPresets = [
             1 => [ // superadmin: all 1
                 'dashboard' => [1,1,1,1], 'brands' => [1,1,1,1], 'categories' => [1,1,1,1], 'products' => [1,1,1,1],
-                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'clients' => [1,1,1,1], 'reports' => [1,1,1,1],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'clients' => [1,1,1,1], 'operations' => [1,1,1,1], 'reports' => [1,1,1,1],
                 'general_cash' => [1,1,1,1], 'branches' => [1,1,1,1], 'system_config' => [1,1,1,1],
                 'users' => [1,1,1,1], 'roles' => [1,1,1,1], 'audit_logs' => [1,1,1,1]
             ],
             2 => [ // admin
                 'dashboard' => [1,0,0,0], 'brands' => [1,1,1,1], 'categories' => [1,1,1,1], 'products' => [1,1,1,1],
-                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'clients' => [1,1,1,1], 'reports' => [1,0,0,0],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'clients' => [1,1,1,1], 'operations' => [1,1,1,1], 'reports' => [1,0,0,0],
                 'general_cash' => [1,1,1,1], 'branches' => [1,1,1,0], 'system_config' => [1,0,1,0],
                 'users' => [1,1,1,1], 'roles' => [1,1,1,0], 'audit_logs' => [1,0,0,0]
             ],
             3 => [ // supervisor
                 'dashboard' => [1,0,0,0], 'brands' => [1,1,1,0], 'categories' => [1,1,1,0], 'products' => [1,1,1,0],
-                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,0], 'loans' => [1,1,1,0], 'clients' => [1,1,1,0], 'reports' => [1,0,0,0],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,0], 'loans' => [1,1,1,0], 'clients' => [1,1,1,0], 'operations' => [1,1,1,0], 'reports' => [1,0,0,0],
                 'general_cash' => [1,0,0,0], 'branches' => [1,0,0,0], 'system_config' => [0,0,0,0],
                 'users' => [1,0,0,0], 'roles' => [1,0,0,0], 'audit_logs' => [1,0,0,0]
             ],
             4 => [ // cashier
                 'dashboard' => [1,0,0,0], 'brands' => [1,0,0,0], 'categories' => [1,0,0,0], 'products' => [1,0,0,0],
-                'orders' => [1,1,1,0], 'cash_register' => [1,1,1,0], 'loans' => [1,0,1,0], 'clients' => [1,1,1,0], 'reports' => [0,0,0,0],
+                'orders' => [1,1,1,0], 'cash_register' => [1,1,1,0], 'loans' => [1,0,1,0], 'clients' => [1,1,1,0], 'operations' => [1,1,1,0], 'reports' => [0,0,0,0],
                 'general_cash' => [0,0,0,0], 'branches' => [0,0,0,0], 'system_config' => [0,0,0,0],
                 'users' => [0,0,0,0], 'roles' => [0,0,0,0], 'audit_logs' => [0,0,0,0]
             ],
             5 => [ // seller
                 'dashboard' => [1,0,0,0], 'brands' => [1,0,0,0], 'categories' => [1,0,0,0], 'products' => [1,0,0,0],
-                'orders' => [1,1,0,0], 'cash_register' => [0,0,0,0], 'loans' => [1,0,0,0], 'clients' => [1,1,0,0], 'reports' => [0,0,0,0],
+                'orders' => [1,1,0,0], 'cash_register' => [0,0,0,0], 'loans' => [1,0,0,0], 'clients' => [1,1,0,0], 'operations' => [1,0,0,0], 'reports' => [0,0,0,0],
                 'general_cash' => [0,0,0,0], 'branches' => [0,0,0,0], 'system_config' => [0,0,0,0],
                 'users' => [0,0,0,0], 'roles' => [0,0,0,0], 'audit_logs' => [0,0,0,0]
             ],
@@ -535,6 +549,151 @@ function ensure_app_schema(mysqli $connect): void
             if (!$chkP->get_result()->fetch_assoc()) {
                 $chkP->close();
                 $insP = $connect->prepare("INSERT INTO `role_permissions` (`role_id`, `module`, `can_access`, `can_create`, `can_update`, `can_delete`) VALUES (?, 'clients', ?, ?, ?, ?)");
+                if ($insP) {
+                    $insP->bind_param('iiiii', $rId, $p[0], $p[1], $p[2], $p[3]);
+                    $insP->execute();
+                    $insP->close();
+                }
+            } else {
+                $chkP->close();
+            }
+        }
+    }
+
+    // 11. Loyalty Points Columns on clients table
+    sb_ensure_table_column($connect, 'clients', 'points_balance', 'INT NOT NULL DEFAULT 0 AFTER `status`');
+    sb_ensure_table_column($connect, 'clients', 'lifetime_points', 'INT NOT NULL DEFAULT 0 AFTER `points_balance`');
+
+    // 12. Loyalty and Operations Settings in system_settings
+    sb_ensure_table_column($connect, 'system_settings', 'points_ratio_soles', 'DECIMAL(10,2) NOT NULL DEFAULT 10.00 AFTER `allow_branch_switching`');
+    sb_ensure_table_column($connect, 'system_settings', 'points_ratio_points', 'INT NOT NULL DEFAULT 1 AFTER `points_ratio_soles`');
+    sb_ensure_table_column($connect, 'system_settings', 'print_double_ticket', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER `points_ratio_points`');
+    sb_ensure_table_column($connect, 'system_settings', 'commission_rate_per_100', 'DECIMAL(10,2) NOT NULL DEFAULT 1.00 AFTER `print_double_ticket`');
+
+    // 13. Branch Operations Table (Deposits & Withdrawals)
+    $connect->query("CREATE TABLE IF NOT EXISTS `branch_operations` (
+      `operation_id` int(11) NOT NULL AUTO_INCREMENT,
+      `branch_id` int(11) NOT NULL,
+      `operation_code` varchar(32) NOT NULL,
+      `client_id` int(11) NOT NULL,
+      `user_id` int(11) NOT NULL,
+      `operation_type` enum('deposit','withdrawal') NOT NULL,
+      `amount` decimal(12,2) NOT NULL,
+      `commission_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+      `commission_included` tinyint(1) NOT NULL DEFAULT 0,
+      `net_amount` decimal(12,2) NOT NULL,
+      `total_customer_amount` decimal(12,2) NOT NULL,
+      `points_earned` int(11) NOT NULL DEFAULT 0,
+      `central_balance_before` decimal(12,2) NOT NULL DEFAULT 0.00,
+      `central_balance_after` decimal(12,2) NOT NULL DEFAULT 0.00,
+      `status` enum('completed','cancelled') NOT NULL DEFAULT 'completed',
+      `notes` text DEFAULT NULL,
+      `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (`operation_id`),
+      UNIQUE KEY `uniq_operation_code` (`operation_code`),
+      KEY `idx_ops_branch` (`branch_id`, `created_at`),
+      KEY `idx_ops_client` (`client_id`),
+      KEY `idx_ops_type` (`operation_type`),
+      KEY `idx_ops_status` (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // 14. Client Points History Table (Audit of all earned, redeemed and reset points)
+    $connect->query("CREATE TABLE IF NOT EXISTS `client_points_history` (
+      `history_id` int(11) NOT NULL AUTO_INCREMENT,
+      `client_id` int(11) NOT NULL,
+      `operation_id` int(11) DEFAULT NULL,
+      `redemption_id` int(11) DEFAULT NULL,
+      `type` enum('earned','redeemed','reset','adjusted') NOT NULL,
+      `points` int(11) NOT NULL,
+      `lifetime_after` int(11) NOT NULL DEFAULT 0,
+      `balance_after` int(11) NOT NULL DEFAULT 0,
+      `description` varchar(255) NOT NULL,
+      `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (`history_id`),
+      KEY `idx_pts_client` (`client_id`, `created_at`),
+      KEY `idx_pts_operation` (`operation_id`),
+      KEY `idx_pts_type` (`type`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // 15. Reward Items Table (Catalog of products/packages with points & price in soles)
+    $connect->query("CREATE TABLE IF NOT EXISTS `reward_items` (
+      `reward_id` int(11) NOT NULL AUTO_INCREMENT,
+      `name` varchar(150) NOT NULL,
+      `description` text DEFAULT NULL,
+      `category` varchar(60) NOT NULL DEFAULT 'general',
+      `points_cost` int(11) NOT NULL,
+      `price_soles` decimal(10,2) NOT NULL DEFAULT 0.00,
+      `stock` int(11) NOT NULL DEFAULT 0,
+      `image` varchar(255) DEFAULT NULL,
+      `status` tinyint(1) NOT NULL DEFAULT 1,
+      `record_status` tinyint(1) NOT NULL DEFAULT 1,
+      `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (`reward_id`),
+      KEY `idx_rewards_status` (`record_status`, `status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    sb_ensure_table_column($connect, 'reward_items', 'category', 'VARCHAR(60) NOT NULL DEFAULT "general"');
+
+    // Seed default reward items if empty
+    $chkRewards = $connect->query("SELECT COUNT(*) AS c FROM `reward_items`");
+    $rewardCount = $chkRewards ? (int)($chkRewards->fetch_assoc()['c'] ?? 0) : 0;
+    if ($rewardCount === 0) {
+        $rewardsSeed = [
+            ['Set Escolar Bartolo (Cuadernos + Lapiceros)', 'Kit de útiles escolares de primera calidad para clientes frecuentes.', 50, 25.00, 20],
+            ['Canasta Familiar Básica', 'Paquete de abarrotes esenciales para el hogar.', 150, 75.00, 15],
+            ['Mochila Ejecutiva Antirrobo', 'Mochila resistente al agua con compartimento para laptop de 15.6 pulgadas.', 250, 120.00, 10],
+            ['Cupón de Descuento S/ 50.00', 'Vale de descuento aplicable en cualquier compra de productos en tienda.', 100, 50.00, 50],
+            ['Licuadora Oster Multivelocidad', 'Electrodoméstico de alta potencia con vaso de vidrio resistente.', 500, 240.00, 5],
+        ];
+        $insR = $connect->prepare("INSERT INTO `reward_items` (`name`, `description`, `points_cost`, `price_soles`, `stock`, `status`, `record_status`) VALUES (?, ?, ?, ?, ?, 1, 1)");
+        if ($insR) {
+            foreach ($rewardsSeed as $r) {
+                $insR->bind_param('ssidi', $r[0], $r[1], $r[2], $r[3], $r[4]);
+                $insR->execute();
+            }
+            $insR->close();
+        }
+    }
+
+    // 16. Reward Redemptions Table
+    $connect->query("CREATE TABLE IF NOT EXISTS `reward_redemptions` (
+      `redemption_id` int(11) NOT NULL AUTO_INCREMENT,
+      `redemption_code` varchar(32) NOT NULL,
+      `branch_id` int(11) NOT NULL,
+      `client_id` int(11) NOT NULL,
+      `user_id` int(11) NOT NULL,
+      `reward_id` int(11) NOT NULL,
+      `points_spent` int(11) NOT NULL,
+      `quantity` int(11) NOT NULL DEFAULT 1,
+      `points_balance_before` int(11) NOT NULL,
+      `points_balance_after` int(11) NOT NULL DEFAULT 0,
+      `notes` text DEFAULT NULL,
+      `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (`redemption_id`),
+      UNIQUE KEY `uniq_redemption_code` (`redemption_code`),
+      KEY `idx_redemptions_branch` (`branch_id`),
+      KEY `idx_redemptions_client` (`client_id`),
+      KEY `idx_redemptions_reward` (`reward_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // Sync 'operations' permissions for existing roles if not present
+    $opsPermsSync = [
+        1 => [1, 1, 1, 1], // superadmin
+        2 => [1, 1, 1, 1], // admin
+        3 => [1, 1, 1, 0], // supervisor
+        4 => [1, 1, 1, 0], // cashier
+        5 => [1, 0, 0, 0], // seller
+    ];
+    foreach ($opsPermsSync as $rId => $p) {
+        $chkP = $connect->prepare("SELECT permission_id FROM `role_permissions` WHERE `role_id` = ? AND `module` = 'operations' LIMIT 1");
+        if ($chkP) {
+            $chkP->bind_param('i', $rId);
+            $chkP->execute();
+            if (!$chkP->get_result()->fetch_assoc()) {
+                $chkP->close();
+                $insP = $connect->prepare("INSERT INTO `role_permissions` (`role_id`, `module`, `can_access`, `can_create`, `can_update`, `can_delete`) VALUES (?, 'operations', ?, ?, ?, ?)");
                 if ($insP) {
                     $insP->bind_param('iiiii', $rId, $p[0], $p[1], $p[2], $p[3]);
                     $insP->execute();

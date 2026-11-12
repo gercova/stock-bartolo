@@ -1,8 +1,8 @@
 # PDR — Preliminary Design Review & Auditoría Técnica
 
 **Proyecto:** Stock Bartolo — Sistema Multi-Sucursal de Inventario, Ventas (POS), Caja y Préstamos  
-**Versión:** `2.2.0` (SPA Vue 3 + Pinia + Multi-Tenant + Caja General & Control de Caja)  
-**Fecha:** 10 de noviembre de 2026
+**Versión:** `2.4.0` (SPA Vue 3 + Pinia + Multi-Tenant + Caja General + Seguridad RBAC + Clientes Decolecta + Operaciones y Fidelización)  
+**Fecha:** 11 de noviembre de 2026
 
 ---
 
@@ -27,6 +27,7 @@ Este documento presenta la arquitectura técnica, el modelo relacional multi-suc
 | **OBJ-11** | Módulo **Gestión de Seguridad** (Usuarios CRUD, Roles CRUD, Matriz de Permisos RBAC de 15 módulos y Registro de Auditoría inmutable) | Completado | [SecurityView.vue](src/views/SecurityView.vue), [security.js](src/stores/security.js), `src/components/security/*`, `php_action/*User*.php`, `*Role*.php`, `fetchAuditLogs.php` |
 | **OBJ-12** | Módulo **Clientes y Proveedores** (CRUD, Integración Decolecta RENIEC/SUNAT y Borrado Lógico *Soft Deletes*) | Completado | [ClientsView.vue](src/views/ClientsView.vue), [ClientModal.vue](src/components/clients/ClientModal.vue), [clients.js](src/stores/clients.js), `php_action/*Client*.php`, `lookupDocument.php` |
 | **OBJ-13** | Conexión de Base de Datos e Integraciones Seguras vía `.env` sin credenciales expuestas | Completado | [.env](.env), [.env.example](.env.example), [env.php](php_action/env.php), [db_connect.php](php_action/db_connect.php) |
+| **OBJ-14** | Módulo **Operaciones y Fidelización** (Depósitos y Retiros dependientes de Caja General, Comisión de 1 sol por cada 100 soles, Checkbox comisión incluida, Programa de Puntos, Catálogo de Premios con reinicio de saldo y preservación inmutable del ranking, y Modal SweetAlert2 con Ticket Térmico de Doble Impresión) | Completado | [OperationsView.vue](src/views/OperationsView.vue), [operations.js](src/stores/operations.js), `src/components/operations/*`, `php_action/*Operation*.php`, `fetchLoyaltyRanking.php`, `fetchRewards.php`, `redeemReward.php`, `printOperationReceipt.php` |
 
 ---
 
@@ -40,9 +41,9 @@ flowchart LR
     SPA -->|"XHR + X-CSRF-Token + Sucursal Activa"| GW["Apache .htaccess / Vite Proxy (Auto-PHP)"]
     GW -->|"/php_action/*"| SEC["core.php + tenant.php + security.php (Auth, Multi-Tenant, CSRF, XSS/SQLi)"]
     GW -->|"/assests/images/*"| IMG["Repositorio Estatico Imagenes (PHP bloqueado)"]
-    SEC --> API["Endpoints API PHP 8 (65 archivos, Prepared Statements + FOR UPDATE)"]
+    SEC --> API["Endpoints API PHP 8 (81 archivos, Prepared Statements + FOR UPDATE)"]
     SEC --> ERR["http_error.php (400-504 JSON o HTML)"]
-    API --> DB[("MySQL / MariaDB pos_stock (21 Tablas Multi-Tenant & Seguridad)")]
+    API --> DB[("MySQL / MariaDB pos_stock (25 Tablas Multi-Tenant, Seguridad y Fidelización)")]
 ```
 
 ### 2.2 Flujo de Capital Operativo: Caja General ↔ Caja Registradora (Por Sucursal)
@@ -400,8 +401,8 @@ Todas las pruebas se ejecutaron directamente contra el entorno real (**PHP 8.3**
 
 | Verificación | Alcance | Resultado |
 | :--- | :--- | :--- |
-| **Sintaxis PHP (`php -l`)** | Los `65` archivos en `php_action/*.php` | **65/65 aprobados (0 errores)** |
-| **Esquema y Migración** | `pos_stock.sql` y `ensure_app_schema($connect)` en MariaDB `pos_stock` | **17/17 tablas verificadas** con datos iniciales limpios en `SUC-001` y `CAJA-01` |
-| **Compilación SPA (`npm run build`)** | Bundle Vite + Vue 3 + Tailwind CSS v4 | **Exitoso** (`2187` módulos compilados sin errores ni advertencias) |
-| **Suite Automatizada API, Multi-Tenant & Seguridad** | Auth `401`, CSRF `403`, políticas (`enforce_open_till_for_cash` -> `400`), creación de Sucursal 2 (`+CAJA-01` + `Caja General`), aislamiento total entre tenants (`fetchSelectedProduct` cruzado `404`, `IVA 15%`), CRUD Caja General (aporte/retiro/sobregiro `400`/edición/anulación), ciclo completo de Caja (apertura fondeada, doble apertura `400`, ventas en efectivo, desembolsos/abonos de préstamos, movimientos `sweep_to_general`, arqueo con 12 denominaciones, cierre con retorno y fondo retenido, bloqueo post-cierre `400`), XSS `<script>/<img onerror>/<svg onload>` (`400`) y SQLi `UNION SELECT` (`400`) + verificación post-edición de timestamps `NOW()` en apertura/arqueo/cierre | **Aprobado al 100% (`{"ok":true}`)** |
-| **Auditoría Visual y Funcional E2E en Navegador (Playwright)** | Login `admin`, `/dashboard` multi-sucursal, `/system-config` (creación de `SUC-002` con `$500` de capital inicial, pestañas `Caja General`, `Sucursales` y `Parámetros del Sistema`), selector topbar `SUC-001 ↔ SUC-002`, `/cash-register` (apertura `$100` desde Caja General, movimiento `+$25`, arqueo con desglose de 12 denominaciones `$125`, detalle Corte X, cierre Corte Z retornando `$100` y reteniendo `$25` -> Caja General vuelve a `$500`), eliminación segura de `SUC-002`, pruebas en escritorio (`1280x800`) y móvil (`375x812`) con apertura de menú drawer | **0 errores de consola**, **0 peticiones fallidas (`200`/`201`)** y **sin desbordamiento horizontal (`scrollWidth 360 <= innerWidth 375`)** |
+| **Sintaxis PHP (`php -l`)** | Los `81` archivos en `php_action/*.php` | **81/81 aprobados (0 errores)** |
+| **Esquema y Migración** | `pos_stock.sql` y `ensure_app_schema($connect)` en MariaDB `pos_stock` | **25/25 tablas verificadas** con datos iniciales limpios en `SUC-001`, `CAJA-01`, catálogo de premios y roles |
+| **Compilación SPA (`npm run build`)** | Bundle Vite + Vue 3 + Tailwind CSS v4 | **Exitoso** (`2204` módulos compilados sin errores) |
+| **Suite Automatizada API, Multi-Tenant, Fidelización & Seguridad** | Auth `401`, CSRF `403`, políticas de caja, depósitos y retiros con comisión (1/100), bloqueo atómico `FOR UPDATE` en Caja General, rechazo por saldo insuficiente (`400`), acumulación de puntos, leaderboard por `lifetime_points DESC`, canje de premios con reset de saldo y preservación inmutable del ranking, Decolecta DNI/RUC, y borrado lógico (*soft deletes*) | **Aprobado al 100%** |
+| **Auditoría Visual y Funcional E2E en Navegador (Playwright)** | Login `admin`, `/operations` (3 pestañas: Operaciones, Ranking, Catálogo de Premios), modal de nueva operación con cálculo de comisión en vivo y checkbox "comisión incluida", modal SweetAlert2 tras registro exitoso, visor de ticket térmico 80mm con opción de doble impresión (Copia Cliente + Copia Empresa), podio de clasificación de clientes, visor de movimientos de puntos y catálogo de recompensas | **0 errores de consola**, **0 peticiones fallidas (`200`/`201`)** |

@@ -338,6 +338,7 @@ import {
   Check,
   Users,
   ShieldCheck,
+  ArrowLeftRight,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -379,6 +380,7 @@ const navGroups = [
       { label: 'Órdenes', to: '/orders', icon: ShoppingCart, match: ['/orders'] },
       { label: 'Agregar Orden', to: '/orders/create', icon: PlusCircle, match: ['/orders/create'] },
       { label: 'Caja', to: '/cash-register', icon: Calculator, match: ['/cash-register'], badge: 'Nuevo' },
+      { label: 'Operaciones', to: '/operations', icon: ArrowLeftRight, match: ['/operations'], badge: 'Puntos' },
       { label: 'Préstamos', to: '/loans', icon: HandCoins, match: ['/loans'] },
       { label: 'Clientes y Prov.', to: '/clients', icon: Users, match: ['/clients'] },
       { label: 'Reportes', to: '/reports', icon: BarChart3, match: ['/reports'] },

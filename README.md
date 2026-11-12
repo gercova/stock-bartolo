@@ -1,6 +1,6 @@
-# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja, Clientes y Seguridad
+# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja, Operaciones, Fidelización, Clientes y Seguridad
 
-Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, reportes, **gestión de préstamos a clientes con interés opcional**, **Padrón de Clientes y Proveedores con consulta en tiempo real RENIEC/SUNAT (Decolecta) y borrado lógico (*soft delete*)**, y **Gestión Integral de Seguridad con control de acceso basado en roles (RBAC), matriz de 15 módulos y registro inmutable de auditoría**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** (`75` endpoints/módulos) y base de datos **MySQL / MariaDB** (`21` tablas) con variables de entorno protegidas vía `.env` y endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
+Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, **Módulo de Operaciones (Depósitos y Retiros con comisión de 1 sol por cada 100 soles)**, **Programa de Fidelización de Clientes con acumulación de puntos, catálogo de premios y ranking histórico inmutable**, reportes, **gestión de préstamos a clientes con interés opcional**, **Padrón de Clientes y Proveedores con consulta en tiempo real RENIEC/SUNAT (Decolecta) y borrado lógico (*soft delete*)**, y **Gestión Integral de Seguridad con control de acceso basado en roles (RBAC), matriz de 16 módulos y registro inmutable de auditoría**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** (`81` endpoints/módulos) y base de datos **MySQL / MariaDB** (`25` tablas) con variables de entorno protegidas vía `.env` y endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
 
 ---
 
@@ -75,7 +75,29 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
   2. **Roles y Matriz de Permisos Granulares**: Perfiles predefinidos (`superadmin`, `admin`, `supervisor`, `cashier`, `seller`) y roles personalizados. Matriz interactiva de **4 privilegios independientes** (`access`, `create`, `update`, `delete`) para los **15 módulos del sistema** en [RoleModal.vue](src/components/security/RoleModal.vue).
   3. **Registro de Auditoría Inmutable (*Audit Log*)**: Historial inmutable en `audit_logs` que registra quién, qué, cuándo, IP, User-Agent, módulo, acción y payload JSON formateado, con visor detallado en [AuditDetailModal.vue](src/components/security/AuditDetailModal.vue).
 
-### 7. Gestión de Inventario, Órdenes y Reportes
+### 7. Módulo de Operaciones, Comisión de Caja y Programa de Fidelización (`/operations`)
+- **Depósitos y Retiros Transaccionales**:
+  - Dependencia estricta del saldo disponible en la **Caja General / Bóveda** de cada sucursal (`SELECT ... FOR UPDATE`). Si un retiro supera los fondos disponibles, la transacción es rechazada automáticamente con mensaje claro e indicación de fondos faltantes.
+  - **Comisión de 1 sol por cada 100 soles**: tarifa global parametrizable (`commission_rate_per_100`).
+  - Modal interactivo de transacción con **casilla de verificación para indicar si el monto ingresado ya incluye la comisión**:
+    - **Comisión incluida**: la comisión se descuenta del monto ingresado (monto neto = monto base - comisión; cliente paga exactamente el monto base en depósito o recibe el monto neto en retiro).
+    - **Comisión adicional**: la comisión se cobra en adición al monto base ingresado.
+  - Resumen financiero en tiempo real: monto base, comisión calculada, monto neto, total de la transacción y puntos a otorgar.
+- **Programa de Fidelización de Clientes Frecuentes**:
+  - Conversión global configurable (`points_ratio_soles`, `points_ratio_points`). Cada transacción suma puntos canjeables (`points_balance`) y puntos históricos de por vida (`lifetime_points`).
+  - **Ranking de Fidelización (Leaderboard)**: podio para los 3 primeros lugares (oro, plata y bronce) y tabla de clasificación general ordenada por `lifetime_points DESC`.
+- **Catálogo de Premios y Canje con Preservación del Ranking**:
+  - Catálogo de productos y paquetes de premios (`reward_items`), cada uno con precio en Soles, costo en puntos y control de stock en tiempo real.
+  - **Reinicio del saldo de puntos tras el canje**: al redimir un premio, el saldo canjeable del cliente se reinicia o descuenta, y el movimiento queda registrado en `client_points_history`.
+  - **Preservación inmutable del ranking**: los `lifetime_points` acumulados de por vida permanecen intactos, garantizando que el cliente jamás pierda su posición en la clasificación de clientes más frecuentes.
+- **Modal SweetAlert2 y Emisión de Ticket Térmico**:
+  - Al completar exitosamente una operación, emerge automáticamente un modal SweetAlert2 con resumen visual de la operación y botón para **Imprimir Ticket**.
+  - Visor de comprobante en formato ticket térmico de 80mm ([ReceiptTicketModal.vue](src/components/operations/ReceiptTicketModal.vue)) con **opción configurable de doble impresión**:
+    - **Copia Cliente**: desglose completo de operación, comisiones, puntos ganados y saldo acumulado.
+    - **Línea de corte**: `--- ✂ CORTAR AQUÍ ✂ ---`.
+    - **Copia Empresa / Caja**: copia idéntica con espacio para firma del cliente.
+
+### 8. Gestión de Inventario, Órdenes y Reportes
 - **Fabricantes (`/brands`)** y **Categorías (`/categories`)**: CRUD por sucursal con búsqueda, filtros y borrado lógico.
 - **Productos (`/products`)**: CRUD por sucursal con carga segura de imágenes (`editProductImage.php`) y alertas de stock bajo (`<= 3` unidades).
 - **Órdenes / POS (`/orders`, `/orders/create`, `/orders/:id/edit`)**: cálculo con tasa de IVA y símbolo de moneda de la sucursal activa, control transaccional de stock (`FOR UPDATE`), verificación de caja abierta cuando `enforce_open_till_for_cash` está activo y ticket imprimible con cabecera de sucursal.
@@ -241,6 +263,7 @@ Vite verifica al iniciar si ya existe un servidor escuchando en `VITE_API_TARGET
 | `/orders/create` | `OrderFormView.vue` | Autenticado | Nueva orden con IVA y símbolo de moneda de la sucursal |
 | `/orders/:id/edit` | `OrderFormView.vue` | Autenticado | Edición de orden existente con ajuste transaccional de stock |
 | `/cash-register` | `CashRegisterView.vue` | Autenticado | Cajas registradoras, apertura, movimientos, arqueo (12 denoms) y cierre Corte Z |
+| `/operations` | `OperationsView.vue` | Autenticado | Depósitos, retiros con comisión (1/100), saldo central, SweetAlert2, ticket térmico doble y ranking de fidelización |
 | `/loans` | `LoansView.vue` | Autenticado | Emisión de préstamos (con/sin interés), abonos e impacto en caja |
 | `/reports` | `ReportsView.vue` | Autenticado | Reportes imprimibles de órdenes y préstamos por sucursal |
 | `/system-config` | `SystemConfigView.vue` | Autenticado | **Caja General multi-sucursal (CRUD), Sucursales (CRUD) y Políticas del Sistema** |
@@ -280,6 +303,12 @@ Todas las rutas mutantes (`POST`, `PUT`, `DELETE`) exigen sesión autenticada (s
 | | `/php_action/addCashMovement.php` | `POST` | Registra ingreso, gasto, retiro manual o traslado parcial hacia Caja General |
 | | `/php_action/reconcileCashSession.php` | `POST` | Registra arqueo (con conteo por denominaciones) y actualiza discrepancia |
 | | `/php_action/closeCashSession.php` | `POST` | Ejecuta cierre `Corte Z`, arqueo final y retorno opcional hacia Caja General |
+| **Operaciones y Puntos** | `/php_action/fetchOperations.php` | `GET` | Lista depósitos/retiros, balance de Caja General de sucursal y estadísticas |
+| | `/php_action/createOperation.php` | `POST` | Registra depósito/retiro con comisión (1/100), bloqueo atómico de Caja General y puntos |
+| | `/php_action/fetchLoyaltyRanking.php` | `GET` | Ranking de clientes ordenado por `lifetime_points DESC` e historial de puntos |
+| | `/php_action/fetchRewards.php` | `GET` | Catálogo de premios en soles y puntos + historial de canjes recientes |
+| | `/php_action/redeemReward.php` | `POST` | Canje transaccional de premio: reinicio/deducción de puntos y preservación de ranking |
+| | `/php_action/printOperationReceipt.php` | `GET` | Payload completo para impresión de ticket térmico simple/doble |
 | **Fabricantes** | `/php_action/*Brand*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchBrand`, `fetchSelectedBrand`, `createBrand`, `editBrand`, `removeBrand` (por sucursal) |
 | **Categorías** | `/php_action/*Categories*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchCategories`, `fetchSelectedCategories`, `createCategories`, `editCategories`, `removeCategories` (por sucursal) |
 | **Productos** | `/php_action/*Product*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchProduct`, `fetchProductData`, `fetchSelectedProduct`, `fetchProductImageUrl`, `createProduct`, `editProduct`, `editProductImage`, `removeProduct` (por sucursal) |

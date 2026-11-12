@@ -9,28 +9,28 @@ function sb_get_system_config(mysqli $connect): array
 
     if (!$row) {
         return [
-            'company_name' => 'Stock Bartolo',
-            'company_tax_id' => '',
-            'company_phone' => '',
-            'company_address' => '',
-            'receipt_footer' => 'Gracias por su preferencia.',
-            'default_tax_rate' => 13.0,
+            'company_name'          => 'Stock Bartolo',
+            'company_tax_id'        => '',
+            'company_phone'         => '',
+            'company_address'       => '',
+            'receipt_footer'        => 'Gracias por su preferencia.',
+            'default_tax_rate'      => 13.0,
             'default_currency_code' => 'USD',
-            'default_currency_symbol' => '$',
-            'enforce_open_till_for_cash' => false,
-            'auto_fund_till_from_general_cash' => true,
-            'auto_return_till_to_general_cash' => true,
+            'default_currency_symbol'           => '$',
+            'enforce_open_till_for_cash'        => false,
+            'auto_fund_till_from_general_cash'  => true,
+            'auto_return_till_to_general_cash'  => true,
             'allow_branch_switching' => true,
         ];
     }
 
     return [
-        'company_name' => (string)$row['company_name'],
-        'company_tax_id' => (string)($row['company_tax_id'] ?? ''),
-        'company_phone' => (string)($row['company_phone'] ?? ''),
-        'company_address' => (string)($row['company_address'] ?? ''),
-        'receipt_footer' => (string)($row['receipt_footer'] ?? 'Gracias por su preferencia.'),
-        'default_tax_rate' => round((float)$row['default_tax_rate'], 2),
+        'company_name'      => (string)$row['company_name'],
+        'company_tax_id'    => (string)($row['company_tax_id'] ?? ''),
+        'company_phone'     => (string)($row['company_phone'] ?? ''),
+        'company_address'   => (string)($row['company_address'] ?? ''),
+        'receipt_footer'    => (string)($row['receipt_footer'] ?? 'Gracias por su preferencia.'),
+        'default_tax_rate'  => round((float)$row['default_tax_rate'], 2),
         'default_currency_code' => (string)($row['default_currency_code'] ?? 'USD'),
         'default_currency_symbol' => (string)($row['default_currency_symbol'] ?? '$'),
         'enforce_open_till_for_cash' => ((int)$row['enforce_open_till_for_cash']) === 1,
@@ -71,8 +71,8 @@ function sb_user_can_switch_branches(mysqli $connect, int $userId): bool
             $u = $stmt->get_result()->fetch_assoc();
             $stmt->close();
             if ($u) {
-                $role = (string)($u['role'] ?? 'superadmin');
-                $_SESSION['user_role'] = $role;
+                $role                           = (string)($u['role'] ?? 'superadmin');
+                $_SESSION['user_role']          = $role;
                 $_SESSION['assigned_branch_id'] = (int)($u['branch_id'] ?? 1);
             }
         }
@@ -88,10 +88,10 @@ function get_active_branch_id(mysqli $connect): int
         return 1;
     }
 
-    $userId = (int)$_SESSION['userId'];
-    $canSwitch = sb_user_can_switch_branches($connect, $userId);
-    $assignedId = max(1, (int)($_SESSION['assigned_branch_id'] ?? 1));
-    $candidateId = $canSwitch
+    $userId         = (int)$_SESSION['userId'];
+    $canSwitch      = sb_user_can_switch_branches($connect, $userId);
+    $assignedId     = max(1, (int)($_SESSION['assigned_branch_id'] ?? 1));
+    $candidateId    = $canSwitch
         ? (int)($_SESSION['active_branch_id'] ?? $assignedId)
         : $assignedId;
 

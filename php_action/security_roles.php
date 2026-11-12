@@ -54,6 +54,12 @@ function sb_get_security_modules(): array
             'description' => 'Administración de cartera de clientes, proveedores, consulta RENIEC/SUNAT y soft deletes.',
         ],
         [
+            'key' => 'operations',
+            'name' => 'Operaciones y Fidelización',
+            'category' => 'Ventas y Finanzas',
+            'description' => 'Depósitos, retiros con comisión, saldo de bóveda central, programa de fidelización y canje de premios.',
+        ],
+        [
             'key' => 'reports',
             'name' => 'Reportes',
             'category' => 'Ventas y Finanzas',

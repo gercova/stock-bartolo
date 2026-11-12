@@ -25,13 +25,18 @@ $autoFundTill       = !empty($data['auto_fund_till_from_general_cash']) ? 1 : 0;
 $autoReturnTill     = !empty($data['auto_return_till_to_general_cash']) ? 1 : 0;
 $allowSwitching     = !empty($data['allow_branch_switching']) ? 1 : 0;
 
+$pointsRatioSoles   = round(max(0.5, (float)($data['points_ratio_soles'] ?? $data['pointsRatioSoles'] ?? 10.0)), 2);
+$pointsRatioPoints  = max(1, (int)($data['points_ratio_points'] ?? $data['pointsRatioPoints'] ?? 1));
+$printDoubleTicket  = isset($data['print_double_ticket']) || isset($data['printDoubleTicket']) ? (!empty($data['print_double_ticket']) || !empty($data['printDoubleTicket']) ? 1 : 0) : 1;
+$commissionRate100  = round(max(0.0, (float)($data['commission_rate_per_100'] ?? $data['commissionRatePer100'] ?? 1.0)), 2);
+
 if ($defaultTaxRate < 0 || $defaultTaxRate > 100) {
     send_http_error(400, 'La tasa de IVA predeterminada debe estar entre 0% y 100%.');
 }
 
-$stmt = $connect->prepare('UPDATE system_settings SET company_name = ?, company_tax_id = ?, company_phone = ?, company_address = ?, receipt_footer = ?, default_tax_rate = ?, default_currency_code = ?, default_currency_symbol = ?, enforce_open_till_for_cash = ?, auto_fund_till_from_general_cash = ?, auto_return_till_to_general_cash = ?, allow_branch_switching = ?, updated_by = ? WHERE setting_id = 1');
+$stmt = $connect->prepare('UPDATE system_settings SET company_name = ?, company_tax_id = ?, company_phone = ?, company_address = ?, receipt_footer = ?, default_tax_rate = ?, default_currency_code = ?, default_currency_symbol = ?, enforce_open_till_for_cash = ?, auto_fund_till_from_general_cash = ?, auto_return_till_to_general_cash = ?, allow_branch_switching = ?, points_ratio_soles = ?, points_ratio_points = ?, print_double_ticket = ?, commission_rate_per_100 = ?, updated_by = ? WHERE setting_id = 1');
 $stmt->bind_param(
-    'sssssdssiiiii',
+    'sssssdssiiiidiidi',
     $companyName,
     $companyTaxId,
     $companyPhone,
@@ -44,6 +49,10 @@ $stmt->bind_param(
     $autoFundTill,
     $autoReturnTill,
     $allowSwitching,
+    $pointsRatioSoles,
+    $pointsRatioPoints,
+    $printDoubleTicket,
+    $commissionRate100,
     $userId
 );
 
