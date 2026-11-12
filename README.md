@@ -21,8 +21,11 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
 
 ## Características Principales
 
-### 1. Arquitectura Multi-Sucursal (Multi-Tenant) e Interface Responsiva (`MainLayout`)
-- Layout adaptable *mobile-first* implementado en [MainLayout.vue](src/layouts/MainLayout.vue) y estado global en [ui.js](src/stores/ui.js).
+### 1. Arquitectura Multi-Sucursal (Multi-Tenant) y Barra Lateral Fija (`MainLayout`)
+- **Barra Lateral Pinned/Fija Permanente (`fixed inset-y-0 left-0 h-screen`)**:
+  - Diseñada para permanecer fija en el lateral izquierdo independientemente de la longitud, scroll o desbordamiento del contenido principal.
+  - La navegación interna cuenta con scroll independiente (`custom-aside-scrollbar`) de diseño estilizado ultra-fino, manteniendo siempre anclados el encabezado de marca y la tarjeta de usuario en la base.
+  - El área de contenido principal se compensa de forma fluida mediante `:class="ui.sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'"` con transiciones suaves de `200ms`.
 - **Selector rápido de sucursal activa** en la barra superior (`switchBranch.php`) con cambio en vivo y remonte reactivo de rutas por sucursal (`branch_id`).
 - Aislamiento estricto por `branch_id` en inventario (`brands`, `categories`, `product`), ventas (`orders`), préstamos (`loans`, `loan_payments`), bóveda de `Caja General` (`general_cash_accounts`, `general_cash_movements`), turnos de `Caja` (`cash_registers`, `cash_sessions`, `cash_movements`, `cash_reconciliations`) y tablero KPI (`fetchDashboard.php`).
 - Cada sucursal mantiene parámetros independientes de tasa fiscal (`tax_rate`), moneda (`currency_code`, `currency_symbol`), datos de contacto y capital operativo.

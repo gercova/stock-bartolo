@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex bg-slate-50 text-slate-900">
+  <div class="min-h-screen bg-slate-50 text-slate-900">
     <!-- Mobile Drawer Backdrop -->
     <Transition name="fade">
       <div
@@ -9,24 +9,38 @@
       ></div>
     </Transition>
 
-    <!-- Sidebar (Mobile Drawer + Desktop Fixed Rail) -->
+    <!-- Sidebar: Fixed permanently regardless of page content or scrolling -->
     <aside
-      class="no-print fixed inset-y-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-100 transition-all duration-200 ease-out lg:static lg:translate-x-0"
+      class="no-print fixed inset-y-0 left-0 z-40 flex flex-col h-screen max-h-screen bg-slate-900 text-slate-100 transition-all duration-200 ease-out border-r border-slate-800/80 shadow-2xl"
       :class="[
-        ui.mobileMenuOpen ? 'translate-x-0 visible' : '-translate-x-full invisible lg:visible',
+        ui.mobileMenuOpen ? 'translate-x-0 visible z-50' : '-translate-x-full invisible lg:visible lg:translate-x-0',
         ui.sidebarCollapsed ? 'lg:w-20' : 'lg:w-64',
         'w-72'
       ]"
     >
-      <!-- Brand Header -->
-      <div class="flex h-16 items-center justify-between gap-3 border-b border-slate-800 px-4">
-        <RouterLink to="/dashboard" class="flex items-center gap-3 min-w-0">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+      <!-- Brand Header (Fixed at top of aside) -->
+      <div
+        class="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-800/80 px-4 bg-gradient-to-b from-slate-900 to-slate-900/90"
+        :class="ui.sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''"
+      >
+        <RouterLink
+          to="/dashboard"
+          class="flex items-center gap-3 min-w-0 group"
+          :title="ui.sidebarCollapsed ? 'Stock Bartolo — Panel General' : undefined"
+        >
+          <div class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-700 to-indigo-500 text-white shadow-md shadow-indigo-600/30 group-hover:scale-105 transition-transform">
             <Boxes class="h-5 w-5" />
+            <span class="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
           </div>
           <div v-if="!ui.sidebarCollapsed" class="min-w-0">
-            <p class="text-sm font-bold tracking-tight text-white truncate">Stock Bartolo</p>
-            <p class="text-[11px] text-indigo-300 truncate">
+            <p class="text-sm font-bold tracking-tight text-white truncate group-hover:text-indigo-200 transition-colors">
+              Stock Bartolo
+            </p>
+            <p class="text-[11px] text-indigo-300/90 truncate flex items-center gap-1">
+              <span class="inline-block h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
               {{ auth.activeBranch ? `${auth.activeBranch.branch_code} · ${auth.activeBranch.branch_name}` : 'Inventario & Crédito' }}
             </p>
           </div>
@@ -42,8 +56,8 @@
         </button>
       </div>
 
-      <!-- Navigation Accordion Modules (AdminLTE Style) -->
-      <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+      <!-- Navigation Accordion Modules (Scrolls independently within fixed aside) -->
+      <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1.5 custom-aside-scrollbar">
         <div v-for="mod in navModules" :key="mod.id" class="rounded-xl">
           <!-- Module Header Accordion Trigger -->
           <button
@@ -85,16 +99,16 @@
           <Transition name="accordion">
             <div
               v-show="openModules[mod.id] && !ui.sidebarCollapsed"
-              class="space-y-1 pt-1 pb-1 pl-3 ml-3 border-l border-slate-800"
+              class="space-y-1 pt-1 pb-1 pl-3 ml-3 border-l border-slate-800/80"
             >
               <RouterLink
                 v-for="item in mod.items"
                 :key="item.to"
                 :to="item.to"
-                class="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors"
+                class="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-all"
                 :class="[
                   isActive(item)
-                    ? 'bg-indigo-600 text-white font-semibold shadow-xs'
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold shadow-sm shadow-indigo-600/30'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white',
                 ]"
                 @click="ui.closeMobileMenu()"
@@ -108,7 +122,7 @@
                 <span
                   v-if="item.badge"
                   class="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                  :class="isActive(item) ? 'bg-indigo-700 text-white' : 'bg-indigo-500/20 text-indigo-200'"
+                  :class="isActive(item) ? 'bg-indigo-800/80 text-white' : 'bg-indigo-500/20 text-indigo-200'"
                 >
                   {{ item.badge }}
                 </span>
@@ -118,18 +132,22 @@
         </div>
       </nav>
 
-      <!-- Sidebar Footer User Pill -->
-      <div class="border-t border-slate-800 p-3">
+      <!-- Sidebar Footer User Pill (Fixed at bottom of aside) -->
+      <div class="shrink-0 border-t border-slate-800/80 p-3 bg-slate-900/95 backdrop-blur-xs">
         <div
-          class="flex items-center gap-3 rounded-xl bg-slate-800/70 p-2.5"
-          :class="ui.sidebarCollapsed ? 'lg:justify-center' : ''"
+          class="flex items-center gap-3 rounded-xl bg-slate-800/80 border border-slate-700/40 p-2.5 transition-all"
+          :class="ui.sidebarCollapsed ? 'lg:justify-center lg:p-2' : ''"
         >
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-xs uppercase">
+          <div class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold text-xs uppercase shadow-sm">
             {{ userInitials }}
+            <span class="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-900" title="En línea"></span>
           </div>
           <div v-if="!ui.sidebarCollapsed" class="min-w-0 flex-1">
-            <p class="text-xs font-semibold text-white truncate">{{ auth.user?.username || 'Usuario' }}</p>
-            <p class="text-[11px] text-slate-400 truncate">Sesión activa</p>
+            <p class="text-xs font-bold text-white truncate">{{ auth.user?.username || 'Usuario' }}</p>
+            <p class="text-[10px] text-emerald-400 font-medium truncate flex items-center gap-1">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+              Sesión activa
+            </p>
           </div>
           <button
             v-if="!ui.sidebarCollapsed"
@@ -144,8 +162,11 @@
       </div>
     </aside>
 
-    <!-- Main Content Column -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <!-- Main Content Column (Offset on desktop to accommodate fixed aside) -->
+    <div
+      class="min-h-screen flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out"
+      :class="ui.sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'"
+    >
       <!-- Top Bar -->
       <header class="no-print sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 backdrop-blur-md px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-3 min-w-0">
@@ -563,5 +584,24 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 .accordion-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/* Custom sleek dark scrollbar for the fixed aside navigation */
+.custom-aside-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-aside-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-aside-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+.custom-aside-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+.custom-aside-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
 }
 </style>
