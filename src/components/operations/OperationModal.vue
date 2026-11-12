@@ -304,6 +304,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useClientsStore } from '@/stores/clients'
 import { useOperationsStore } from '@/stores/operations'
+import { findUnsafeField, sanitizeObject } from '@/utils/security'
 
 const props = defineProps({
   modelValue: {
@@ -429,15 +430,23 @@ async function handleSubmit() {
   if (isInsufficientBalance.value) return
   if (!form.client_id || Number(form.amount) <= 0) return
 
+  const unsafe = findUnsafeField({
+    'Notas / Observaciones': form.notes,
+  })
+  if (unsafe) {
+    alert(`El campo "${unsafe}" contiene caracteres o código no permitidos por seguridad.`)
+    return
+  }
+
   submitting.value = true
   try {
-    const res = await operationsStore.createOperation({
+    const res = await operationsStore.createOperation(sanitizeObject({
       client_id: form.client_id,
       operation_type: form.operation_type,
       amount: form.amount,
       commission_included: form.commission_included,
       notes: form.notes,
-    })
+    }))
     emit('created', res.operation)
     close()
   } catch (err) {

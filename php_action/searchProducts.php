@@ -4,7 +4,9 @@ require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
 
 $branchId = get_active_branch_id($connect);
-$query = trim((string)($_GET['query'] ?? $_GET['q'] ?? $_GET['search'] ?? ''));
+$reqData = get_request_data();
+$rawQuery = $_GET['query'] ?? $_GET['q'] ?? $_GET['search'] ?? $reqData['query'] ?? $reqData['q'] ?? $reqData['search'] ?? '';
+$query = sanitize_clean_text($rawQuery, 'parámetro de búsqueda', 100, false);
 
 // Strictly configured to return a maximum of 5 results to avoid overloading server and database
 $limit = 5;

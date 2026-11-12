@@ -15,8 +15,8 @@ ErrorDocument 502 /php_action/error.php?code=502
 ErrorDocument 503 /php_action/error.php?code=503
 ErrorDocument 504 /php_action/error.php?code=504
 
-# Block access to sensitive internal files and hidden directories
-<FilesMatch "(^\.|pos_stock\.sql$|error_log$|package(-lock)?\.json$|vite\.config\.js$)">
+# Block access to sensitive internal files, configs, and hidden directories
+<FilesMatch "(^\.|\.env|\.env\..*|pos_stock\.sql$|error_log$|package(-lock)?\.json$|vite\.config\.js$|\.(md|log|lock|bak|sh)$)">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
@@ -30,9 +30,12 @@ ErrorDocument 504 /php_action/error.php?code=504
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
-  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
   Header always set X-XSS-Protection "0"
-  Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  Header always set X-Permitted-Cross-Domain-Policies "none"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>
 
 <IfModule mod_rewrite.c>

@@ -509,7 +509,7 @@ import { useOrdersStore } from '@/stores/orders'
 import { useUiStore } from '@/stores/ui'
 import apiClient, { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
-import { findUnsafeField } from '@/utils/security'
+import { findUnsafeField, sanitizeInput } from '@/utils/security'
 import CustomSelect2Product from '@/components/common/CustomSelect2Product.vue'
 import OrderReceiptModal from '@/components/orders/OrderReceiptModal.vue'
 
@@ -776,6 +776,16 @@ async function submitOrder() {
     return i.productId > 0 && Number(i.quantity) > 0
   })
 
+  for (const item of validItems) {
+    if (item.isCustom && item.customName) {
+      const unsafeItem = findUnsafeField({ 'Descripción personalizada': item.customName })
+      if (unsafeItem) {
+        ui.error(`El ítem personalizado "${item.customName}" contiene caracteres o código no permitidos.`)
+        return
+      }
+    }
+  }
+
   if (validItems.length === 0) {
     ui.warning('Debes seleccionar al menos un producto o agregar un ítem personalizado con precio válido.')
     return
@@ -786,8 +796,8 @@ async function submitOrder() {
     const payload = {
       orderDate: form.orderDate,
       clientId: form.clientId,
-      clientName: form.clientName,
-      clientContact: form.clientContact,
+      clientName: sanitizeInput(form.clientName),
+      clientContact: sanitizeInput(form.clientContact),
       discount: Number(form.discount) || 0,
       paid: Number(form.paid) || 0,
       paymentType: form.paymentType,
@@ -795,7 +805,7 @@ async function submitOrder() {
       items: validItems.map((i) => ({
         isCustom: i.isCustom,
         productId: i.productId,
-        customName: i.customName,
+        customName: i.customName ? sanitizeInput(i.customName) : '',
         rate: Number(i.rate) || 0,
         quantity: i.quantity,
       })),

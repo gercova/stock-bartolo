@@ -360,10 +360,79 @@ Todas las rutas mutantes (`POST`, `PUT`, `DELETE`) exigen sesión autenticada (s
 
 ## Medidas de Seguridad Implementadas
 
-Un desglose detallado se encuentra en [PDR.md](PDR.md). En resumen:
+Stock Bartolo incorpora una arquitectura de seguridad integral multicapa (defensa en profundidad), abordando la protección de sesiones, tokens contra falsificación de peticiones en sitios cruzados (CSRF), sanitización estricta de entradas, filtros contra código malicioso e inyección, y cabeceras HTTP de protección para clientes y servidores. Un desglose exhaustivo y formal se encuentra en [PDR.md](PDR.md).
+
+### 1. Gestión Segura de Sesiones y Protección Anti-Hijacking
+- **Configuración Hardened de PHP Runtime (`security.php`)**:
+  - `session.cookie_httponly = 1`: Impide el acceso a la cookie `PHPSESSID` desde JavaScript (`document.cookie`), neutralizando el robo de sesión ante ataques XSS.
+  - `session.use_only_cookies = 1` y `session.use_trans_sid = 0`: Prohíbe terminantemente la transmisión de identificadores de sesión a través de parámetros URL.
+  - `session.use_strict_mode = 1`: Rechaza cualquier identificador de sesión no inicializado por el propio servidor, previniendo ataques de fijación de sesión (*Session Fixation*).
+  - `session.cookie_samesite = 'Lax'`: Protege el intercambio de cookies en solicitudes externas o de terceros.
+  - `session.sid_length = 48` y `session.sid_bits_per_character = 6`: Genera identificadores criptográficamente robustos con alta entropía.
+  - Detección automática y transparente de HTTPS (soporta puertos estándar `443` y proxies reversos mediante `HTTP_X_FORWARDED_PROTO`, `HTTP_X_FORWARDED_SSL` y `HTTP_FRONT_END_HTTPS`).
+- **Huella Digital de Sesión (Session Fingerprinting)**:
+  - En cada autenticación exitosa, el servidor computa una huella criptográfica (`create_session_fingerprint`) vinculando el `user_id`, la cabecera `User-Agent` del navegador y el prefijo de subred del cliente (`/24` para IPv4 o `/64` para IPv6).
+  - Si un atacante roba o clona la cookie `PHPSESSID` e intenta presentarla desde otro dispositivo, navegador o entorno, `validate_session_fingerprint()` detecta la discrepancia inmediatamente, destruye la sesión en el servidor y retorna `401 Unauthorized`.
+- **Rotación Periódica y Tiempo de Vida Absoluto**:
+  - **Rotación periódica (30 minutos)**: Si la sesión supera los 30 minutos de actividad, se ejecuta `session_regenerate_id(true)` para rotar el identificador manteniendo los datos del usuario.
+  - **Expiración absoluta (12 horas)**: La sesión tiene un límite de vida máximo de 12 horas desde su creación (`created_at`), obligando a un re-inicio de sesión para prevenir sesiones perpetuas.
+- **Destrucción Rigurosa al Cerrar Sesión (`logout.php`)**:
+  - Invalida la sesión en el servidor (`$_SESSION = []`, `session_destroy()`) y emite una orden de expiración de cookie con las opciones modernas de PHP (`samesite => 'Lax'`, `path => '/'`, timestamp en el pasado).
+
+### 2. Tokens CSRF (Cross-Site Request Forgery)
+- **Generación Criptográfica y Almacenamiento**:
+  - Se genera un token de 256 bits mediante `bin2hex(random_bytes(32))` almacenado en `$_SESSION['csrf_token']`.
+  - Se emite simultáneamente en la cookie `XSRF-TOKEN` (`SameSite=Lax`, `path=/`, `secure=is_https_request()`).
+- **Verificación en el Servidor (`core.php`)**:
+  - Todos los métodos mutantes (`POST`, `PUT`, `DELETE`, `PATCH`) exigen la cabecera `X-CSRF-Token`.
+  - La verificación se realiza con `hash_equals()`, garantizando comparación en tiempo constante para evitar ataques de temporización (*timing attacks*).
+- **Inyección y Recuperación Automática en el Cliente (`client.js`)**:
+  - Axios extrae y adjunta automáticamente el token en cada petición mutante.
+  - Si la sesión renueva el token, el cliente actualiza su referencia reactiva.
+  - Ante una respuesta `403` con código `csrf_invalid`, el interceptor de Axios solicita automáticamente un nuevo token a `/php_action/csrfToken.php` y reintenta la petición original de forma transparente para el usuario.
+
+### 3. Sanitización de Entradas y Filtro Anti-Cargas Maliciosas
+- **Detección y Rechazo Temprano (`detect_malicious_payload`)**:
+  - Toda petición entrante es analizada recursivamente antes de procesar lógica de negocio. Si contiene secuencias maliciosas, se rechaza inmediatamente con `400 Bad Request`:
+    - **XSS**: Detección de `<script>`, `onerror=`, `onload=`, `javascript:`, `expression(`, `vbscript:`, `<iframe`, etc.
+    - **Inyección SQL**: Detección de secuencias como `UNION SELECT`, `INTO OUTFILE`, `INFORMATION_SCHEMA`, `--`, `/*`, `SLEEP()`, `BENCHMARK()`.
+    - **Inyección de Comandos del SO**: Filtro contra ejecución de comandos shell (`cat`, `ls`, `rm`, `chmod`, `wget`, `curl`, `bash`, `sh`, `nc`, `python`, `eval`, `system`, etc.).
+    - **Path Traversal y Acceso a Archivos del Sistema**: Bloqueo de `../`, `..\`, `/etc/passwd`, `/proc/self`, etc.
+    - **Esquemas Peligrosos**: Bloqueo de `gopher://`, `dict://`, `phar://`, `ldap://`.
+- **Sanitizadores Tipados en el Backend (`security.php`)**:
+  - Funciones de tipado estricto: `sanitize_integer`, `sanitize_float`, `sanitize_email`, `sanitize_phone`, `sanitize_document`, `sanitize_boolean`, y `sanitize_clean_text` (que aplica `strip_tags()` y remueve caracteres nulos o de control).
+- **Validación y Limpieza en el Frontend (`src/utils/security.js`)**:
+  - Validación en vivo en todos los modales y formularios (`findUnsafeField` y `DANGEROUS_PATTERNS`).
+  - Limpieza de datos antes del envío con `sanitizeObject` y `sanitizeInput`.
+  - Validadores dedicados de formato para correos (`isValidEmail`), teléfonos (`isValidPhone`) y documentos de identidad (`isValidDocNumber`).
+
+### 4. Cabeceras HTTP de Seguridad
+- Se emiten automáticamente tanto desde el backend PHP (`security.php`) como en el servidor web Apache ([.htaccess](.htaccess)):
+  - `X-Content-Type-Options: nosniff`: Evita que el navegador interprete archivos con un tipo MIME diferente al declarado.
+  - `X-Frame-Options: DENY`: Impide que la aplicación sea embebida en `<iframe>`, `frame` u `object`, previniendo ataques de *Clickjacking*.
+  - `Referrer-Policy: strict-origin-when-cross-origin`: Restringe el envío de URLs de procedencia a terceros.
+  - `Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()`: Deshabilita accesos no autorizados a APIs del dispositivo.
+  - `X-XSS-Protection: 0`: Desactiva filtros XSS heredados del navegador que introducían vulnerabilidades adicionales.
+  - `X-Permitted-Cross-Domain-Policies: none`: Bloquea documentos de políticas de dominio cruzado (Flash/PDF).
+  - `Cross-Origin-Opener-Policy: same-origin`: Aísla el contexto de navegación contra accesos desde ventanas emergentes.
+  - `Cross-Origin-Resource-Policy: same-origin`: Prohíbe a otros orígenes cargar recursos o endpoints de la API.
+  - `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` en respuestas de API JSON.
+  - `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0` y `Pragma: no-cache` en respuestas de API para prevenir el almacenamiento en caché de balances y credenciales.
+
+### 5. Blindaje del Servidor Apache ([.htaccess](.htaccess))
+- Reglas `FilesMatch` que prohíben terminantemente el acceso web a:
+  - Archivos de entorno y credenciales: `.env`, `.env.*`.
+  - Repositorios y control de versiones: directorios y archivos `.git*`.
+  - Configuración de paquetes y dependencias: `composer.json`, `composer.lock`, `package.json`, `package-lock.json`, `vite.config.js`.
+  - Volcados de bases de datos y scripts: `*.sql`, `*.sh`, `*.bak`.
+  - Registros y documentación: `*.log`, `*.md`.
+- Protección estricta en el directorio de subida de imágenes (`assests/images/stock/.htaccess`): prohíbe la ejecución de scripts `.php`, `.phtml`, `.cgi`, etc.
+
+### 6. Aislamiento Multi-Tenant e Integridad Transaccional
 - **Aislamiento Multi-Tenant (`tenant.php`)**: Todas las lecturas y mutaciones aplican filtrado estricto `branch_id = $_SESSION['active_branch_id']`; los accesos cruzados entre sucursales responden `404` / `403`.
-- **Integridad Transaccional Financiera**: Todas las mutaciones de saldo en `Caja General`, apertura/arqueo/cierre de `Caja`, descuento de inventario y abonos emplean `begin_transaction()` + bloqueo de fila `SELECT ... FOR UPDATE`.
-- **Protección XSS, CSRF, SQLi, Brute-Force y Carga Maliciosa**: Sanitización en [security.js](src/utils/security.js) y [security.php](php_action/security.php), `X-CSRF-Token` verificado con `hash_equals()`, rate limiting en `login_attempts` (`429`), 100% sentencias preparadas y validación MIME real con `finfo` + `getimagesize()`.
+- **Integridad Transaccional Financiera**: Todas las mutaciones de saldo en `Caja General`, apertura/arqueo/cierre de `Caja`, depósitos/retiros con comisión, descuento de inventario y abonos emplean `begin_transaction()` + bloqueo de fila `SELECT ... FOR UPDATE`.
+- **Control de Fuerza Bruta**: Tabla `login_attempts` con bloqueo por IP y usuario tras 5 intentos fallidos (`429 Too Many Requests`).
+- **100% Sentencias Preparadas (`mysqli::prepare`)**: Neutralización total de inyección SQL en todos los endpoints.
 
 ---
 

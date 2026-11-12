@@ -192,6 +192,7 @@
 import { computed, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { Eye, EyeOff, Loader2 } from '@lucide/vue'
+import { findUnsafeField, sanitizeObject, isValidEmail } from '@/utils/security'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -276,8 +277,24 @@ function handleSubmit() {
     errorMessage.value = 'La contraseña debe tener al menos 6 caracteres.'
     return
   }
+  if (form.value.email && !isValidEmail(form.value.email)) {
+    errorMessage.value = 'El formato del correo electrónico no es válido.'
+    return
+  }
 
-  emit('save', {
+  const unsafe = findUnsafeField({
+    'Usuario': form.value.username,
+    'Nombre completo': form.value.full_name,
+    'Correo electrónico': form.value.email,
+    'Teléfono': form.value.phone,
+  })
+
+  if (unsafe) {
+    errorMessage.value = `El campo "${unsafe}" contiene código o caracteres no permitidos por seguridad.`
+    return
+  }
+
+  emit('save', sanitizeObject({
     user_id: form.value.user_id,
     username: form.value.username,
     full_name: form.value.full_name,
@@ -287,7 +304,7 @@ function handleSubmit() {
     branch_id: form.value.branch_id ? Number(form.value.branch_id) : null,
     password: form.value.password || undefined,
     active: form.value.active ? 1 : 0,
-  })
+  }))
 }
 </script>
 

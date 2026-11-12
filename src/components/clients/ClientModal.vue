@@ -312,6 +312,7 @@ import {
 } from '@lucide/vue'
 import { useClientsStore } from '@/stores/clients'
 import { extractErrorMessage } from '@/api/client'
+import { findUnsafeField, sanitizeObject } from '@/utils/security'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -473,9 +474,25 @@ function handleSubmit() {
     return
   }
 
-  emit('save', {
-    ...form.value,
+  const unsafe = findUnsafeField({
+    'Documento': form.value.document_number,
+    'Nombre / Razón Social': form.value.name,
+    'Nombres': form.value.first_name,
+    'Apellidos': form.value.last_name,
+    'Correo electrónico': form.value.email,
+    'Teléfono': form.value.phone,
+    'Dirección': form.value.address,
+    'Notas': form.value.notes,
   })
+
+  if (unsafe) {
+    errorMessage.value = `El campo "${unsafe}" contiene código o caracteres no permitidos por seguridad.`
+    return
+  }
+
+  emit('save', sanitizeObject({
+    ...form.value,
+  }))
 }
 </script>
 

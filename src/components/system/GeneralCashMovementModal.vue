@@ -100,7 +100,7 @@ import { useSystemConfigStore } from '@/stores/systemConfig'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
-import { findUnsafeField } from '@/utils/security'
+import { findUnsafeField, sanitizeObject } from '@/utils/security'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -162,12 +162,16 @@ async function submitForm() {
 
   saving.value = true
   try {
+    const cleanPayload = sanitizeObject({
+      reference: form.reference,
+      description: form.description,
+    })
+
     if (isEdit.value) {
       const res = await store.updateGeneralCashMovement({
         branchId: props.branch?.branch_id,
         movementId: props.movement.movement_id,
-        reference: form.reference,
-        description: form.description,
+        ...cleanPayload,
       })
       ui.success(res?.messages || 'Movimiento actualizado.')
     } else {
@@ -175,8 +179,7 @@ async function submitForm() {
         branchId: props.branch?.branch_id,
         movementType: form.movementType,
         amount: form.amount,
-        reference: form.reference,
-        description: form.description,
+        ...cleanPayload,
       })
       ui.success(res?.messages || 'Movimiento registrado.')
     }

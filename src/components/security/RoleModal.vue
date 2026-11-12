@@ -245,6 +245,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { CheckSquare, Loader2, Lock, ShieldAlert } from '@lucide/vue'
+import { findUnsafeField, sanitizeObject } from '@/utils/security'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -363,6 +364,16 @@ function handleSubmit() {
     return
   }
 
+  const unsafe = findUnsafeField({
+    'Nombre del rol': form.value.role_name,
+    'Descripción': form.value.description,
+  })
+
+  if (unsafe) {
+    errorMessage.value = `El campo "${unsafe}" contiene código o caracteres no permitidos por seguridad.`
+    return
+  }
+
   const permissionsList = props.availableModules.map((m) => ({
     module: m.key,
     can_access: isSuperadmin.value ? true : Boolean(permissionsMap[m.key]?.can_access),
@@ -371,12 +382,12 @@ function handleSubmit() {
     can_delete: isSuperadmin.value ? true : Boolean(permissionsMap[m.key]?.can_delete),
   }))
 
-  emit('save', {
+  emit('save', sanitizeObject({
     role_id: form.value.role_id,
     role_name: form.value.role_name,
     description: form.value.description,
     permissions: permissionsList,
-  })
+  }))
 }
 </script>
 

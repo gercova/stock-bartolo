@@ -216,6 +216,8 @@ import {
 } from '@lucide/vue'
 import { useClientsStore } from '@/stores/clients'
 import { useOperationsStore } from '@/stores/operations'
+import { useUiStore } from '@/stores/ui'
+import { findUnsafeField, sanitizeInput } from '@/utils/security'
 
 const props = defineProps({
   modelValue: {
@@ -232,6 +234,7 @@ const emit = defineEmits(['update:modelValue', 'redeemed'])
 
 const clientsStore = useClientsStore()
 const operationsStore = useOperationsStore()
+const ui = useUiStore()
 
 const clientId = ref('')
 const clientSearch = ref('')
@@ -283,12 +286,19 @@ function close() {
 
 async function handleSubmit() {
   if (!canAfford.value || !props.reward || props.reward.stock <= 0) return
+  if (notes.value) {
+    const unsafe = findUnsafeField({ Notas: notes.value })
+    if (unsafe) {
+      ui.error(`El campo "${unsafe}" contiene caracteres o código no permitidos.`)
+      return
+    }
+  }
   submitting.value = true
   try {
     const res = await operationsStore.redeemReward({
       client_id: clientId.value,
       reward_id: props.reward.reward_id,
-      notes: notes.value,
+      notes: sanitizeInput(notes.value),
       reset_balance: resetBalance.value,
     })
     emit('redeemed', res)

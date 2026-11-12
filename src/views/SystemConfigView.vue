@@ -897,7 +897,7 @@ import { useSystemConfigStore } from '@/stores/systemConfig'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency, formatDateTime, generalCashMovementMeta } from '@/utils/formatters'
-import { findUnsafeField } from '@/utils/security'
+import { findUnsafeField, sanitizeObject } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import BranchFormModal from '@/components/system/BranchFormModal.vue'
@@ -1133,7 +1133,8 @@ async function submitSystemSettings() {
 
   savingSettings.value = true
   try {
-    const res = await store.saveSystemConfig({ ...settingsForm })
+    const cleanSettings = sanitizeObject({ ...settingsForm })
+    const res = await store.saveSystemConfig(cleanSettings)
     ui.success(res?.messages || 'Parámetros guardados exitosamente.')
   } catch (err) {
     ui.error(extractErrorMessage(err))

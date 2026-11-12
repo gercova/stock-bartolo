@@ -11,6 +11,12 @@ function is_https_request(): bool
     if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
         return true;
     }
+    if (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_SSL']) === 'on') {
+        return true;
+    }
+    if (!empty($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower((string)$_SERVER['HTTP_FRONT_END_HTTPS']) === 'on') {
+        return true;
+    }
     return false;
 }
 
@@ -20,6 +26,11 @@ function configure_secure_php_environment(): void
     @ini_set('session.use_strict_mode', '1');
     @ini_set('session.use_only_cookies', '1');
     @ini_set('session.cookie_httponly', '1');
+    @ini_set('session.cookie_samesite', 'Lax');
+    @ini_set('session.use_trans_sid', '0');
+    @ini_set('session.sid_length', '48');
+    @ini_set('session.sid_bits_per_character', '6');
+    @ini_set('session.gc_maxlifetime', '7200');
 }
 
 function send_security_headers(bool $isHtml = false): void
@@ -30,16 +41,41 @@ function send_security_headers(bool $isHtml = false): void
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: strict-origin-when-cross-origin');
-    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()');
     header('X-XSS-Protection: 0');
+    header('X-Permitted-Cross-Domain-Policies: none');
+    header('Cross-Origin-Opener-Policy: same-origin');
+    header('Cross-Origin-Resource-Policy: same-origin');
+
+    if (is_https_request()) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    }
 
     if ($isHtml) {
-        header("Content-Security-Policy: default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'self'; frame-ancestors 'none'");
+        header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
     } else {
         header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0');
         header('Pragma: no-cache');
+        header('Expires: 0');
     }
+}
+
+function create_session_fingerprint(int $userId): string
+{
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown_agent';
+    $ip = get_client_ip();
+    $ipPrefix = substr($ip, 0, 7); // First octets / subnet prefix
+    return hash('sha256', $userId . '|' . $ua . '|' . $ipPrefix);
+}
+
+function validate_session_fingerprint(int $userId): bool
+{
+    if (empty($_SESSION['auth_fingerprint'])) {
+        return true; // Graceful migration
+    }
+    $expected = create_session_fingerprint($userId);
+    return hash_equals($_SESSION['auth_fingerprint'], $expected);
 }
 
 function enforce_session_timeout(int $maxIdleSeconds = 7200): void
@@ -144,16 +180,20 @@ function detect_malicious_payload(string $value): ?string
     }
 
     $patterns = [
-        'script_tag'    => '/<\s*\/?\s*script\b/i',
-        'php_tag'       => '/<\?(?:php|=|\s)/i',
-        'dangerous_tag' => '/<\s*(?:iframe|object|embed|applet|meta|base)\b/i',
-        'svg_event'     => '/<\s*svg\b[^>]*\bon[a-z]+\s*=/i',
-        'script_uri'    => '/(?:javascript|vbscript)\s*:/i',
-        'data_html_uri' => '/data\s*:\s*text\/html/i',
-        'inline_handler' => '/\bon(?:abort|blur|change|click|dblclick|error|focus|input|keydown|keypress|keyup|load|mousedown|mouseenter|mouseleave|mousemove|mouseout|mouseover|mouseup|reset|resize|select|submit|unload)\s*=/i',
-        'sqli_union'    => '/\bunion\s+(?:all\s+)?select\b/i',
-        'sqli_outfile'  => '/\binto\s+(?:outfile|dumpfile)\b/i',
-        'sqli_timing'   => '/\b(?:sleep|benchmark)\s*\(/i',
+        'script_tag'         => '/<\s*\/?\s*script\b/i',
+        'php_tag'            => '/<\?(?:php|=|\s)/i',
+        'dangerous_tag'      => '/<\s*(?:iframe|object|embed|applet|meta|base)\b/i',
+        'svg_event'          => '/<\s*svg\b[^>]*\bon[a-z]+\s*=/i',
+        'script_uri'         => '/(?:javascript|vbscript)\s*:/i',
+        'data_html_uri'      => '/data\s*:\s*text\/html/i',
+        'inline_handler'     => '/\bon(?:abort|blur|change|click|dblclick|error|focus|input|keydown|keypress|keyup|load|mousedown|mouseenter|mouseleave|mousemove|mouseout|mouseover|mouseup|reset|resize|select|submit|unload)\s*=/i',
+        'sqli_union'         => '/\bunion\s+(?:all\s+)?select\b/i',
+        'sqli_outfile'       => '/\binto\s+(?:outfile|dumpfile)\b/i',
+        'sqli_timing'        => '/\b(?:sleep|benchmark)\s*\(/i',
+        'path_traversal'     => '/(?:\.\.\/|\.\.\\)/',
+        'command_injection'  => '/(?:;|&&|\|\|)\s*(?:cat|ls|rm|chmod|chown|wget|curl|bash|sh|nc|python|perl|eval|exec|system|passthru)\b/i',
+        'system_probe'       => '/(?:\/etc\/(?:passwd|shadow|hosts)|\/proc\/self)/i',
+        'dangerous_protocol' => '/\b(?:gopher|dict|phar|ldap|expect):\/\//i',
     ];
 
     foreach ($patterns as $name => $regex) {
@@ -275,6 +315,126 @@ function validate_iso_date(?string $rawDate, string $fieldLabel, bool $required 
     }
 
     send_http_error(400, "El formato de {$fieldLabel} no es válido (usa YYYY-MM-DD).");
+}
+
+function sanitize_integer(mixed $val, string $fieldLabel, ?int $min = null, ?int $max = null, int $default = 0, bool $required = false): int
+{
+    if ($val === null || (is_string($val) && trim($val) === '')) {
+        if ($required) {
+            send_http_error(400, "El campo numérico {$fieldLabel} es obligatorio.");
+        }
+        return $default;
+    }
+    if (!is_numeric($val)) {
+        send_http_error(400, "El valor ingresado en {$fieldLabel} debe ser un número entero.");
+    }
+    $intVal = (int)$val;
+    if ($min !== null && $intVal < $min) {
+        send_http_error(400, "El valor de {$fieldLabel} no puede ser menor a {$min}.");
+    }
+    if ($max !== null && $intVal > $max) {
+        send_http_error(400, "El valor de {$fieldLabel} no puede ser mayor a {$max}.");
+    }
+    return $intVal;
+}
+
+function sanitize_float(mixed $val, string $fieldLabel, ?float $min = null, ?float $max = null, float $default = 0.0, bool $required = false): float
+{
+    if ($val === null || (is_string($val) && trim($val) === '')) {
+        if ($required) {
+            send_http_error(400, "El importe o valor {$fieldLabel} es obligatorio.");
+        }
+        return $default;
+    }
+    if (!is_numeric($val)) {
+        send_http_error(400, "El valor ingresado en {$fieldLabel} debe ser un importe numérico válido.");
+    }
+    $floatVal = round((float)$val, 4);
+    if ($min !== null && $floatVal < $min) {
+        send_http_error(400, "El importe de {$fieldLabel} no puede ser inferior a {$min}.");
+    }
+    if ($max !== null && $floatVal > $max) {
+        send_http_error(400, "El importe de {$fieldLabel} no puede exceder {$max}.");
+    }
+    return $floatVal;
+}
+
+function sanitize_email(mixed $val, string $fieldLabel = 'correo electrónico', bool $required = false): string
+{
+    $clean = strtolower(trim((string)($val ?? '')));
+    if ($clean === '') {
+        if ($required) {
+            send_http_error(400, "El {$fieldLabel} es obligatorio.");
+        }
+        return '';
+    }
+    if (!filter_var($clean, FILTER_VALIDATE_EMAIL)) {
+        send_http_error(400, "El formato del {$fieldLabel} no es válido.");
+    }
+    if (strlen($clean) > 191) {
+        send_http_error(400, "El {$fieldLabel} no puede exceder los 191 caracteres.");
+    }
+    return $clean;
+}
+
+function sanitize_phone(mixed $val, string $fieldLabel = 'teléfono', bool $required = false): string
+{
+    $clean = trim((string)($val ?? ''));
+    if ($clean === '') {
+        if ($required) {
+            send_http_error(400, "El {$fieldLabel} es obligatorio.");
+        }
+        return '';
+    }
+    if (!preg_match('/^[+()0-9\s-]{6,30}$/', $clean)) {
+        send_http_error(400, "El formato del {$fieldLabel} no es válido.");
+    }
+    return $clean;
+}
+
+function sanitize_document(mixed $val, string $docType, string $fieldLabel = 'documento', bool $required = true): string
+{
+    $clean = strtoupper(trim((string)($val ?? '')));
+    if ($clean === '') {
+        if ($required) {
+            send_http_error(400, "El número de {$fieldLabel} es obligatorio.");
+        }
+        return '';
+    }
+    switch (strtoupper($docType)) {
+        case 'DNI':
+            if (!preg_match('/^\d{8}$/', $clean)) {
+                send_http_error(400, "El DNI debe contener exactamente 8 dígitos numéricos.");
+            }
+            break;
+        case 'RUC':
+            if (!preg_match('/^\d{11}$/', $clean)) {
+                send_http_error(400, "El RUC debe contener exactamente 11 dígitos numéricos.");
+            }
+            break;
+        case 'CE':
+            if (!preg_match('/^[A-Z0-9]{8,15}$/', $clean)) {
+                send_http_error(400, "El Carnet de Extranjería debe tener entre 8 y 15 caracteres alfanuméricos.");
+            }
+            break;
+        default:
+            if (strlen($clean) < 3 || strlen($clean) > 30) {
+                send_http_error(400, "El {$fieldLabel} debe tener entre 3 y 30 caracteres.");
+            }
+            break;
+    }
+    return $clean;
+}
+
+function sanitize_boolean(mixed $val): bool
+{
+    if (is_bool($val)) return $val;
+    if (is_numeric($val)) return (int)$val === 1;
+    if (is_string($val)) {
+        $clean = strtolower(trim($val));
+        return in_array($clean, ['1', 'true', 'yes', 'on', 'si'], true);
+    }
+    return false;
 }
 
 function get_client_ip(): string

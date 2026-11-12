@@ -128,7 +128,7 @@ import { UserCog, KeyRound, CheckCircle2, Loader2, SlidersHorizontal } from '@lu
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
-import { findUnsafeField } from '@/utils/security'
+import { findUnsafeField, sanitizeInput } from '@/utils/security'
 
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -158,7 +158,7 @@ async function submitUsername() {
   }
   savingUsername.value = true
   try {
-    const res = await auth.updateUsername(usernameForm.username)
+    const res = await auth.updateUsername(sanitizeInput(usernameForm.username))
     ui.success(res?.messages || 'Usuario actualizado exitosamente.')
   } catch (err) {
     ui.error(extractErrorMessage(err))

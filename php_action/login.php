@@ -88,11 +88,20 @@ $_SESSION['user_role']          = (string)($user['role'] ?? 'superadmin');
 $_SESSION['assigned_branch_id'] = max(1, (int)($user['branch_id'] ?? 1));
 $_SESSION['active_branch_id']   = $_SESSION['assigned_branch_id'];
 $_SESSION['last_activity']      = time();
+$_SESSION['session_start_time'] = time();
+$_SESSION['session_created_at'] = time();
+$_SESSION['auth_fingerprint']   = create_session_fingerprint((int)$user['user_id']);
 
 $newCsrf = rotate_csrf_token();
 ensure_app_schema($connect);
 
-$connect->query("UPDATE users SET last_login = NOW() WHERE user_id = " . (int)$user['user_id']);
+$updLoginStmt = $connect->prepare("UPDATE users SET last_login = NOW() WHERE user_id = ?");
+if ($updLoginStmt) {
+    $uidToUpdate = (int)$user['user_id'];
+    $updLoginStmt->bind_param('i', $uidToUpdate);
+    $updLoginStmt->execute();
+    $updLoginStmt->close();
+}
 $permissions = sb_get_user_permissions($connect, (int)$user['user_id']);
 
 sb_log_audit(

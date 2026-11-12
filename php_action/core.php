@@ -35,8 +35,32 @@ if (!defined('SKIP_AUTH_CHECK')) {
     if (empty($_SESSION['userId'])) {
         send_http_error(401, 'Tu sesión ha expirado o no has iniciado sesión.');
     }
-    $authUid    = (int)$_SESSION['userId'];
-    $uCheck     = $connect->prepare('SELECT active, role_id, role, branch_id FROM users WHERE user_id = ? LIMIT 1');
+    $authUid = (int)$_SESSION['userId'];
+
+    // Validate session fingerprint (anti-hijacking)
+    if (!validate_session_fingerprint($authUid)) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+        send_http_error(401, 'Tu sesión ha sido invalidada por seguridad debido a un cambio en el entorno de red o navegador.');
+    }
+
+    // Absolute session timeout check (12 hours maximum)
+    if (!empty($_SESSION['session_start_time']) && (time() - (int)$_SESSION['session_start_time'] > 43200)) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+        send_http_error(401, 'Tu sesión ha alcanzado el límite máximo de duración (12 horas). Por favor, inicia sesión nuevamente.');
+    }
+
+    // Periodic session ID regeneration (every 30 minutes of active use)
+    if (empty($_SESSION['session_created_at'])) {
+        $_SESSION['session_created_at'] = time();
+    } elseif (time() - (int)$_SESSION['session_created_at'] > 1800) {
+        session_regenerate_id(true);
+        $_SESSION['session_created_at'] = time();
+        issue_csrf_cookie(ensure_csrf_token());
+    }
+
+    $uCheck = $connect->prepare('SELECT active, role_id, role, branch_id FROM users WHERE user_id = ? LIMIT 1');
     if ($uCheck) {
         $uCheck->bind_param('i', $authUid);
         $uCheck->execute();
@@ -62,6 +86,11 @@ if (in_array($requestMethod, ['GET', 'HEAD'], true)) {
 
 if (!empty($_GET)) {
     inspect_request_payload($_GET);
+}
+
+// Automatically inspect incoming request payload on mutating requests
+if (in_array($requestMethod, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
+    get_request_data();
 }
 
 function get_request_data(): array

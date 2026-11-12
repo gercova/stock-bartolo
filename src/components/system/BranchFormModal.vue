@@ -174,7 +174,7 @@ import BaseModal from '@/components/common/BaseModal.vue'
 import { useSystemConfigStore } from '@/stores/systemConfig'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
-import { findUnsafeField } from '@/utils/security'
+import { findUnsafeField, isValidEmail, isValidPhone, sanitizeObject } from '@/utils/security'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -252,37 +252,39 @@ async function submitForm() {
     return
   }
 
+  if (form.email && !isValidEmail(form.email)) {
+    ui.error('El formato del correo electrónico de la sucursal no es válido.')
+    return
+  }
+  if (form.phone && !isValidPhone(form.phone)) {
+    ui.error('El número de teléfono solo puede contener números, espacios y los símbolos +, -, (, ).')
+    return
+  }
+
   saving.value = true
   try {
+    const cleanPayload = sanitizeObject({
+      branchCode: form.branchCode,
+      branchName: form.branchName,
+      managerName: form.managerName,
+      phone: form.phone,
+      email: form.email,
+      address: form.address,
+      taxRate: form.taxRate,
+      currencyCode: form.currencyCode,
+      currencySymbol: form.currencySymbol,
+      active: form.active,
+      initialCapital: form.initialCapital,
+    })
+
     if (isEdit.value) {
       const res = await store.updateBranch({
         branchId: props.branch.branch_id,
-        branchCode: form.branchCode,
-        branchName: form.branchName,
-        managerName: form.managerName,
-        phone: form.phone,
-        email: form.email,
-        address: form.address,
-        taxRate: form.taxRate,
-        currencyCode: form.currencyCode,
-        currencySymbol: form.currencySymbol,
-        active: form.active,
+        ...cleanPayload,
       })
       ui.success(res?.messages || 'Sucursal actualizada.')
     } else {
-      const res = await store.createBranch({
-        branchCode: form.branchCode,
-        branchName: form.branchName,
-        managerName: form.managerName,
-        phone: form.phone,
-        email: form.email,
-        address: form.address,
-        taxRate: form.taxRate,
-        currencyCode: form.currencyCode,
-        currencySymbol: form.currencySymbol,
-        active: form.active,
-        initialCapital: form.initialCapital,
-      })
+      const res = await store.createBranch(cleanPayload)
       ui.success(res?.messages || 'Sucursal creada exitosamente.')
     }
     emit('saved')
