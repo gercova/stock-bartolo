@@ -23,6 +23,9 @@ $status = isset($data['status']) ? ((int)$data['status'] === 1 ? 1 : 0) : 1;
 $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' && (int)$data['branch_id'] > 0 ? (int)$data['branch_id'] : null;
 $notes = trim((string)($data['notes'] ?? ''));
 
+$birthDate = !empty($data['birth_date']) ? trim((string)$data['birth_date']) : null;
+$gender = !empty($data['gender']) ? trim((string)$data['gender']) : null;
+
 $validDocTypes = ['DNI', 'RUC', 'CE', 'PASAPORTE', 'OTRO'];
 if (!in_array($docType, $validDocTypes, true)) {
     send_http_error(400, 'Tipo de documento no válido. Opciones: DNI, RUC, CE, PASAPORTE, OTRO.');
@@ -118,6 +121,15 @@ if (!$insStmt->execute()) {
 
 $newClientId = (int)$insStmt->insert_id;
 $insStmt->close();
+
+if ($birthDate || $gender) {
+    $upExtra = $connect->prepare('UPDATE clients SET birth_date = ?, gender = ? WHERE client_id = ?');
+    if ($upExtra) {
+        $upExtra->bind_param('ssi', $birthDate, $gender, $newClientId);
+        $upExtra->execute();
+        $upExtra->close();
+    }
+}
 
 $typeLabel = match ($clientType) {
     'supplier' => 'Proveedor',

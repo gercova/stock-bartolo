@@ -75,144 +75,140 @@
     <form v-else class="space-y-6" @submit.prevent="submitOrder">
       <!-- ================= 1. CUSTOMER INFORMATION SECTION ================= -->
       <div class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <h3 class="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
               <UserCheck class="h-4 w-4 text-indigo-600" />
               Información del Cliente
             </h3>
             <p class="text-xs text-slate-500">
-              Busca en el padrón local o consulta automáticamente en tiempo real ante RENIEC / SUNAT vía Decolecta.
+              Busca en la base de datos con el selector inteligente o consulta en tiempo real ante RENIEC / SUNAT.
             </p>
           </div>
 
-          <!-- Quick status indicator if customer is picked from DB or API -->
-          <div v-if="selectedClientBadge" class="flex items-center gap-1.5 text-xs">
-            <span class="rounded-full bg-indigo-50 px-2.5 py-0.5 font-bold text-indigo-700 border border-indigo-200">
-              {{ selectedClientBadge }}
-            </span>
-            <button
-              type="button"
-              class="text-slate-400 hover:text-slate-600 text-xs font-semibold underline ml-1"
-              @click="clearCustomerSelection"
-            >
-              Cambiar
-            </button>
-          </div>
-        </div>
-
-        <!-- Integrated Customer Search Bar (Select2-like for Clients) -->
-        <div class="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-2">
-          <label class="block text-xs font-bold text-slate-700">
-            Búsqueda Rápida de Cliente (DNI, RUC o Nombre):
-          </label>
-          <div class="flex flex-col sm:flex-row gap-2">
-            <div class="relative flex-1">
-              <Search class="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
-              <input
-                v-model="clientSearchQuery"
-                type="text"
-                placeholder="Ingresa 8 dígitos para DNI, 11 para RUC, o escribe el nombre..."
-                class="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-9 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                @input="onClientSearchInput"
-                @keydown.enter.prevent="executeDecolectaLookup"
-              />
-              <button
-                v-if="clientSearchQuery"
-                type="button"
-                class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
-                @click="clearClientSearch"
-              >
-                <X class="h-4 w-4" />
-              </button>
-            </div>
-
-            <!-- RENIEC / SUNAT Query Button (visible if query looks like document) -->
-            <button
-              v-if="isDocumentCandidate"
-              type="button"
-              class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition shrink-0"
-              :disabled="lookingUpDoc"
-              @click="executeDecolectaLookup"
-            >
-              <Loader2 v-if="lookingUpDoc" class="h-3.5 w-3.5 animate-spin" />
-              <Search v-else class="h-3.5 w-3.5" />
-              Consultar {{ docTypeLabel }} (Decolecta)
-            </button>
-          </div>
-
-          <!-- Dropdown Search Results from Local Client Directory -->
-          <div
-            v-if="clientSearchResults.length > 0 && showClientDropdown"
-            class="mt-1 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden divide-y divide-slate-100 z-20"
-          >
-            <div class="bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-500 flex justify-between">
-              <span>Clientes encontrados en base de datos local:</span>
-              <button type="button" class="text-slate-400 hover:text-slate-600" @click="showClientDropdown = false">Cerrar</button>
-            </div>
-            <div
-              v-for="c in clientSearchResults"
-              :key="c.client_id"
-              class="flex items-center justify-between gap-3 px-3.5 py-2 cursor-pointer hover:bg-indigo-50 transition text-xs"
-              @click="selectLocalClient(c)"
-            >
-              <div class="min-w-0">
-                <p class="font-bold text-slate-900 truncate">{{ c.name }}</p>
-                <p class="text-[11px] text-slate-500">
-                  <span v-if="c.document_number">{{ c.document_type || 'DOC' }}: {{ c.document_number }} · </span>
-                  <span v-if="c.phone">Tel: {{ c.phone }}</span>
-                </p>
-              </div>
-              <div class="text-right shrink-0">
-                <span class="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-                  {{ c.points_balance || 0 }} pts
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Customer Form Fields (Auto-filled or manual) -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">Fecha de orden *</label>
+          <!-- Order Date Field (Right-aligned in header) -->
+          <div class="flex items-center gap-2 shrink-0 text-xs">
+            <label class="font-bold text-slate-600">Fecha de orden *</label>
             <input
               v-model="form.orderDate"
               type="date"
               required
-              class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
+        </div>
 
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">
-              Nombre / Razón Social del cliente *
-            </label>
-            <input
-              v-model.trim="form.clientName"
-              type="text"
-              required
-              placeholder="Nombre completo o razón social"
-              class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
+        <!-- Customer Search Row: Select2 Input + Green Plus Button (Matches Screenshot) -->
+        <div class="space-y-1">
+          <label class="block text-xs font-semibold text-[#1f6497]">Cliente:</label>
+          <div class="flex items-center gap-2 max-w-2xl">
+            <!-- Custom Select2 Client Component (Zero NPM dependencies) -->
+            <div class="flex-1">
+              <CustomSelect2Client
+                v-model="form.clientId"
+                :client="selectedClientObj"
+                placeholder="88888888 - PUBLICO GENERAL"
+                @select="onClientSelect"
+                @clear="onClientClear"
+              />
+            </div>
+
+            <!-- Green Plus Button to Open RENIEC / SUNAT Lookup Modal (Matches Screenshot) -->
+            <button
+              type="button"
+              class="h-8 w-8 flex items-center justify-center rounded-md bg-[#00a65a] hover:bg-[#008d4c] text-white active:scale-95 transition shadow-xs shrink-0"
+              title="Consultar cliente por DNI/RUC ante RENIEC / SUNAT"
+              @click="openReniecModal = true"
+            >
+              <Plus class="h-4 w-4 stroke-[3]" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Selected Customer Details (Exact visual match from Screenshot) -->
+        <div
+          v-if="selectedClientObj"
+          class="pt-1 text-xs text-slate-800 space-y-1 max-w-2xl"
+        >
+          <!-- Row 1: Document Type & Number -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              {{ (selectedClientObj.document_type === 'OTRO' ? 'OTROS' : (selectedClientObj.document_type || 'OTROS')).toUpperCase() }}:
+            </span>
+            <span class="font-extrabold text-slate-900">
+              {{ selectedClientObj.document_number || '88888888' }}
+            </span>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">
-              Teléfono / Contacto *
-            </label>
-            <input
-              v-model.trim="form.clientContact"
-              type="text"
-              required
-              placeholder="Ej. +51 987654321"
-              class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
+          <!-- Row 2: Customer Name -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              Cliente:
+            </span>
+            <span class="font-normal text-slate-800">
+              {{ selectedClientObj.name }}
+            </span>
+          </div>
+
+          <!-- Row 3: Birthdate and Age -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              F. Nac.:
+            </span>
+            <div class="flex items-baseline gap-10">
+              <span class="text-slate-800">
+                {{ selectedClientObj.birth_date || '0000-00-00' }}
+              </span>
+              <div class="flex items-baseline gap-2">
+                <span class="font-medium text-[#1f6497]">Edad:</span>
+                <span class="text-slate-800">{{ calculateAge(selectedClientObj.birth_date) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 4: Gender -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              Sexo:
+            </span>
+            <span class="text-slate-800">
+              {{ selectedClientObj.gender || '' }}
+            </span>
+          </div>
+
+          <!-- Row 5: Email -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              Correo:
+            </span>
+            <span class="text-slate-800">
+              {{ selectedClientObj.email || '' }}
+            </span>
+          </div>
+
+          <!-- Row 6: Address -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              Dirección:
+            </span>
+            <span class="text-slate-800">
+              {{ selectedClientObj.address || '' }}
+            </span>
+          </div>
+
+          <!-- Row 7: Phone / Mobile -->
+          <div class="flex items-baseline">
+            <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+              Teléfono/Cel:
+            </span>
+            <span class="text-slate-800">
+              {{ selectedClientObj.phone || '/' }}
+            </span>
           </div>
         </div>
       </div>
 
-      <!-- ================= 2. PRODUCT & CUSTOM ITEMS TABLE ================= -->
+      <!-- ================= 2. PRODUCT & CUSTOM ITEMS SECTION ================= -->
       <div class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
@@ -221,45 +217,75 @@
               Detalle de Productos y Servicios
             </h3>
             <p class="text-xs text-slate-500">
-              Busca en el catálogo con el selector rápido (máx. 5 resultados) o agrega ítems libres de texto personalizado.
+              Utiliza el buscador rápido para agregar ítems del catálogo o agrega ítems libres de texto personalizado.
             </p>
           </div>
+        </div>
 
-          <!-- Row Adding Buttons -->
-          <div class="flex flex-wrap items-center gap-2">
-            <!-- Button 1: Add Catalog Product -->
+        <!-- DEDICATED PRODUCT SEARCH & QUICK ADD SECTION (SELECT2-LIKE) -->
+        <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2.5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <label class="block text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2">
+              <PackageSearch class="h-4 w-4 text-indigo-600" />
+              Búsqueda de Productos (Catálogo)
+            </label>
+            <span class="text-[11px] font-medium text-slate-500">
+              Al seleccionar un producto se agregará automáticamente a la tabla (máx. 5 resultados)
+            </span>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div class="flex-1">
+              <CustomSelect2Product
+                v-model="quickProductId"
+                placeholder="Escribe el nombre o código del producto para buscar y añadir a la lista..."
+                clear-on-select
+                @select="addProductToOrder"
+              />
+            </div>
+
+            <!-- Retained Button for Adding Custom (Free-Text) Entry -->
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
-              @click="addProductRow"
-            >
-              <Plus class="h-3.5 w-3.5" />
-              Añadir Producto (Catálogo)
-            </button>
-
-            <!-- Button 2: Add Custom Free-Text Item (Requirement) -->
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition shadow-2xs"
+              class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 transition shadow-2xs shrink-0"
               @click="addCustomRow"
             >
-              <FileEdit class="h-3.5 w-3.5 text-amber-600" />
+              <FileEdit class="h-4 w-4 text-amber-600" />
               Añadir Ítem Libre / Servicio
             </button>
           </div>
         </div>
 
-        <!-- Table Line Items -->
+        <!-- TABLE OF LINE ITEMS -->
         <div class="space-y-3">
+          <!-- Headers for Desktop -->
+          <div class="hidden sm:grid grid-cols-12 gap-3 px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <div class="col-span-5">Producto / Concepto</div>
+            <div class="col-span-2 text-right">Precio Unit. ({{ currencySymbol }})</div>
+            <div class="col-span-2 text-center">Cantidad</div>
+            <div class="col-span-2 text-right">Importe</div>
+            <div class="col-span-1 text-center">Acción</div>
+          </div>
+
+          <!-- Empty state if no items -->
+          <div
+            v-if="form.items.length === 0"
+            class="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 space-y-2"
+          >
+            <Package class="h-8 w-8 text-slate-300 mx-auto" />
+            <p>No hay productos en la orden. Usa el buscador superior para agregar productos o el botón de ítem libre.</p>
+          </div>
+
+          <!-- Line Item Rows -->
           <div
             v-for="(row, idx) in form.items"
             :key="row.uid"
-            class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end rounded-xl border p-3.5 transition"
+            class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center rounded-xl border p-3.5 transition"
             :class="row.isCustom ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200 bg-slate-50/50'"
           >
-            <!-- Column 1: Product Selector (Custom Select2 Component) OR Free-Text Input -->
+            <!-- Column 1: Product / Custom Name -->
             <div class="sm:col-span-5">
-              <!-- Case A: Free-Text Custom Item -->
+              <!-- Custom Free-Text Item -->
               <div v-if="row.isCustom" class="space-y-1">
                 <div class="flex items-center justify-between">
                   <label class="block text-xs font-bold text-amber-800">
@@ -273,37 +299,42 @@
                   v-model.trim="row.customName"
                   type="text"
                   required
-                  placeholder="Ej. Servicio de delivery, Mano de obra, Empaque especial..."
+                  placeholder="Ej. Servicio de delivery, Empaque especial, Mano de obra..."
                   class="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
 
-              <!-- Case B: Standard Catalog Product (Custom Select2 Component, Max 5 results) -->
+              <!-- Catalog Product Item -->
               <div v-else class="space-y-1">
                 <div class="flex items-center justify-between">
                   <label class="block text-xs font-bold text-slate-700">
-                    Producto (Catálogo) *
+                    Producto del Catálogo
                   </label>
-                  <span class="text-[10px] text-slate-400">Selector inteligente</span>
+                  <span
+                    v-if="row.stock !== undefined"
+                    class="text-[10px] font-semibold"
+                    :class="row.stock > 5 ? 'text-emerald-700' : row.stock > 0 ? 'text-amber-700' : 'text-rose-600'"
+                  >
+                    Stock: {{ row.stock }} uds
+                  </span>
                 </div>
                 <CustomSelect2Product
                   v-model="row.productId"
                   :initial-product-name="row.productNameFallback"
                   :initial-rate="row.rate"
                   :initial-stock="row.stock"
-                  placeholder="Buscar producto (máx. 5 resultados)..."
+                  placeholder="Buscar o cambiar producto..."
                   @select="onProductSelect(row, $event)"
                   @clear="onProductClear(row)"
                 />
               </div>
             </div>
 
-            <!-- Column 2: Unit Price (Editable for Custom Item, Fixed for Catalog) -->
+            <!-- Column 2: Unit Price (Editable if custom, disabled if catalog) -->
             <div class="sm:col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">
+              <label class="block text-xs font-medium text-slate-600 mb-1 sm:hidden">
                 Precio Unit. ({{ currencySymbol }}) *
               </label>
-              <!-- If custom item, allow editing rate -->
               <input
                 v-if="row.isCustom"
                 v-model.number="row.rate"
@@ -311,38 +342,37 @@
                 step="0.01"
                 min="0.01"
                 required
-                class="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-amber-500 focus:outline-none"
+                class="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-right text-sm font-semibold text-slate-900 focus:border-amber-500 focus:outline-none"
               />
-              <!-- Otherwise read-only product catalog price -->
               <input
                 v-else
                 type="text"
                 disabled
                 :value="formatCurrency(row.rate)"
-                class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-right text-sm font-semibold text-slate-700"
               />
             </div>
 
             <!-- Column 3: Quantity -->
             <div class="sm:col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad *</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1 sm:hidden">Cantidad *</label>
               <input
                 v-model.number="row.quantity"
                 type="number"
                 min="1"
                 required
-                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-center text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none"
               />
             </div>
 
             <!-- Column 4: Line Total -->
             <div class="sm:col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Importe</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1 sm:hidden">Importe</label>
               <input
                 type="text"
                 disabled
                 :value="formatCurrency((row.rate || 0) * (row.quantity || 0))"
-                class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-bold text-slate-900"
+                class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-right text-sm font-bold text-indigo-700"
               />
             </div>
 
@@ -350,9 +380,8 @@
             <div class="sm:col-span-1 flex justify-end">
               <button
                 type="button"
-                class="rounded-xl border border-rose-200 bg-white p-2 text-rose-600 hover:bg-rose-50 disabled:opacity-40 transition"
-                :disabled="form.items.length <= 1"
-                title="Quitar fila"
+                class="rounded-xl border border-rose-200 bg-white p-2 text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition"
+                title="Quitar producto de la orden"
                 @click="removeRow(idx)"
               >
                 <Trash2 class="h-4 w-4" />
@@ -478,6 +507,13 @@
       </div>
     </form>
 
+    <!-- RENIEC / SUNAT Client Lookup Modal -->
+    <OrderClientLookupModal
+      :open="openReniecModal"
+      @close="openReniecModal = false"
+      @selected="onClientFromModal"
+    />
+
     <!-- Multi-Format Receipt Print Modal (Ticket, A5, A4) -->
     <OrderReceiptModal
       :open="showReceiptModal"
@@ -498,11 +534,14 @@ import {
   CheckCircle2,
   Search,
   X,
+  User,
   UserCheck,
   ShoppingCart,
   FileEdit,
   AlertOctagon,
   Calculator,
+  PackageSearch,
+  Package,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrdersStore } from '@/stores/orders'
@@ -510,7 +549,9 @@ import { useUiStore } from '@/stores/ui'
 import apiClient, { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
 import { findUnsafeField, sanitizeInput } from '@/utils/security'
+import CustomSelect2Client from '@/components/common/CustomSelect2Client.vue'
 import CustomSelect2Product from '@/components/common/CustomSelect2Product.vue'
+import OrderClientLookupModal from '@/components/orders/OrderClientLookupModal.vue'
 import OrderReceiptModal from '@/components/orders/OrderReceiptModal.vue'
 
 const route = useRoute()
@@ -535,25 +576,12 @@ const checkingCashSession = ref(true)
 const hasOpenCashSession = computed(() => Boolean(openCashSession.value))
 const openSessionCode = computed(() => openCashSession.value?.session_code || '')
 
-// Customer Search & RENIEC/SUNAT State
-const clientSearchQuery = ref('')
-const clientSearchResults = ref([])
-const showClientDropdown = ref(false)
-const lookingUpDoc = ref(false)
-const selectedClientBadge = ref('')
-let clientSearchTimer = null
+// Customer State & RENIEC/SUNAT Modal
+const openReniecModal = ref(false)
+const selectedClientObj = ref(null)
 
-const isDocumentCandidate = computed(() => {
-  const q = clientSearchQuery.value.trim()
-  return /^\d{8}$/.test(q) || /^\d{11}$/.test(q)
-})
-
-const docTypeLabel = computed(() => {
-  const q = clientSearchQuery.value.trim()
-  if (/^\d{8}$/.test(q)) return 'RENIEC (DNI)'
-  if (/^\d{11}$/.test(q)) return 'SUNAT (RUC)'
-  return 'Documento'
-})
+// Dedicated Product Search Bar State
+const quickProductId = ref(0)
 
 // Receipt Modal State
 const completedPrintData = ref(null)
@@ -649,81 +677,92 @@ function onProductClear(row) {
   row.stock = 0
 }
 
-// Customer Search & Decolecta Integration
-function onClientSearchInput() {
-  const query = clientSearchQuery.value.trim()
-  if (!query) {
-    clientSearchResults.value = []
-    showClientDropdown.value = false
+// Dedicated Product Search Selection -> Adds to Table
+function addProductToOrder(product) {
+  if (!product || !product.product_id) return
+
+  // 1. If product is already in the table, increment its quantity
+  const existing = form.items.find((i) => !i.isCustom && i.productId === product.product_id)
+  if (existing) {
+    existing.quantity = (Number(existing.quantity) || 0) + 1
+    ui.info(`Cantidad incrementada a ${existing.quantity} para: ${product.product_name}`, 'Producto actualizado')
     return
   }
 
-  if (clientSearchTimer) clearTimeout(clientSearchTimer)
-  clientSearchTimer = setTimeout(async () => {
-    try {
-      const { data } = await apiClient.get('/fetchClients.php', {
-        params: { search: query },
-      })
-      clientSearchResults.value = (data?.data || []).slice(0, 5)
-      showClientDropdown.value = clientSearchResults.value.length > 0
-    } catch {
-      clientSearchResults.value = []
-    }
-  }, 220)
+  // 2. If table only has 1 initial empty item, replace it
+  if (form.items.length === 1 && !form.items[0].isCustom && form.items[0].productId === 0) {
+    form.items[0].productId = product.product_id
+    form.items[0].productNameFallback = product.product_name
+    form.items[0].rate = Number(product.rate) || 0
+    form.items[0].stock = Number(product.quantity) || 0
+    form.items[0].quantity = 1
+    ui.success(`Producto añadido: ${product.product_name}`, 'Producto agregado')
+    return
+  }
+
+  // 3. Otherwise add new row
+  form.items.push({
+    uid: uidCounter++,
+    isCustom: false,
+    productId: product.product_id,
+    customName: '',
+    productNameFallback: product.product_name,
+    rate: Number(product.rate) || 0,
+    quantity: 1,
+    stock: Number(product.quantity) || 0,
+  })
+  ui.success(`Producto añadido: ${product.product_name}`, 'Producto agregado')
 }
 
-function selectLocalClient(client) {
-  form.clientId = client.client_id
-  form.clientName = client.name
+// Client Selection Handlers
+function onClientSelect(client) {
+  if (!client) {
+    onClientClear()
+    return
+  }
+  selectedClientObj.value = client
+  form.clientId = client.client_id || null
+  form.clientName = client.name || ''
   form.clientContact = client.phone || (client.document_number ? `${client.document_type || 'DOC'}: ${client.document_number}` : '')
-  selectedClientBadge.value = `Cliente Local (${client.document_number || 'Registrado'})`
-  clientSearchQuery.value = ''
-  clientSearchResults.value = []
-  showClientDropdown.value = false
-  ui.info(`Cliente seleccionado: ${client.name}`, 'Cliente cargado')
 }
 
-async function executeDecolectaLookup() {
-  const q = clientSearchQuery.value.trim().replace(/[^0-9]/g, '')
-  if (q.length !== 8 && q.length !== 11) {
-    ui.warning('Ingresa un número de DNI válido (8 dígitos) o RUC (11 dígitos).')
-    return
-  }
-
-  lookingUpDoc.value = true
-  try {
-    const docType = q.length === 8 ? 'DNI' : 'RUC'
-    const { data } = await apiClient.get('/lookupDocument.php', {
-      params: { type: docType, number: q },
-    })
-
-    if (data?.data) {
-      const c = data.data
-      form.clientId = c.client_id || null
-      form.clientName = c.name || ''
-      form.clientContact = c.phone || `${c.document_type || docType}: ${c.document_number || q}`
-      selectedClientBadge.value = data.source === 'local_database' ? `Padrón Local (${q})` : `Consulta RENIEC/SUNAT (${q})`
-      clientSearchQuery.value = ''
-      showClientDropdown.value = false
-      ui.success(`Datos obtenidos para: ${form.clientName}`, 'Consulta Exitosa')
-    }
-  } catch (err) {
-    ui.error(extractErrorMessage(err))
-  } finally {
-    lookingUpDoc.value = false
-  }
-}
-
-function clearCustomerSelection() {
+function onClientClear() {
+  selectedClientObj.value = null
   form.clientId = null
-  selectedClientBadge.value = ''
-  clientSearchQuery.value = ''
+  form.clientName = ''
+  form.clientContact = ''
 }
 
-function clearClientSearch() {
-  clientSearchQuery.value = ''
-  clientSearchResults.value = []
-  showClientDropdown.value = false
+function onClientFromModal(client) {
+  onClientSelect(client)
+  ui.success(`Cliente "${client.name}" cargado en la orden.`, 'Cliente Seleccionado')
+}
+
+function calculateAge(birthDateStr) {
+  if (!birthDateStr || birthDateStr === '0000-00-00') return 0
+  const bDate = new Date(birthDateStr)
+  if (isNaN(bDate.getTime())) return 0
+  const today = new Date()
+  let age = today.getFullYear() - bDate.getFullYear()
+  const m = today.getMonth() - bDate.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+    age--
+  }
+  return Math.max(0, age)
+}
+
+async function loadDefaultClient() {
+  try {
+    const { data } = await apiClient.get('/fetchClients.php', {
+      params: { search: '88888888' },
+    })
+    const def = (data?.data || []).find((c) => c.document_number === '88888888' || c.name === 'PUBLICO GENERAL') || data?.data?.[0]
+    if (def) {
+      onClientSelect(def)
+    }
+  } catch {
+    // ignore
+  }
 }
 
 function resetForm() {
@@ -735,7 +774,7 @@ function resetForm() {
   form.paid = 0
   form.paymentType = 2
   form.paymentStatus = 1
-  selectedClientBadge.value = ''
+  selectedClientObj.value = null
   form.items = [
     {
       uid: uidCounter++,
@@ -748,6 +787,7 @@ function resetForm() {
       stock: 0,
     },
   ]
+  loadDefaultClient()
 }
 
 async function submitOrder() {
@@ -757,6 +797,11 @@ async function submitOrder() {
       'Para realizar cualquier actividad comercial u orden de venta, la caja registradora de la sucursal debe estar abierta.',
       'Caja Registradora Cerrada'
     )
+    return
+  }
+
+  if (!form.clientName || form.clientName.trim() === '') {
+    ui.warning('Debes seleccionar o ingresar un cliente para la orden.')
     return
   }
 
@@ -888,7 +933,41 @@ onMounted(async () => {
         if (form.items.length === 0) {
           addProductRow()
         }
+
+        // Fetch client details if client_id present
+        if (data.order.client_id) {
+          try {
+            const { data: cData } = await apiClient.get('/fetchClients.php', {
+              params: { search: '' },
+            })
+            const cFound = (cData?.data || []).find((c) => c.client_id === Number(data.order.client_id))
+            if (cFound) {
+              selectedClientObj.value = cFound
+            } else {
+              selectedClientObj.value = {
+                client_id: data.order.client_id,
+                name: data.order.client_name,
+                phone: data.order.client_contact,
+                document_type: 'OTROS',
+                document_number: '-',
+              }
+            }
+          } catch {
+            // ignore
+          }
+        } else {
+          selectedClientObj.value = {
+            client_id: null,
+            name: data.order.client_name,
+            phone: data.order.client_contact,
+            document_type: 'OTROS',
+            document_number: '-',
+          }
+        }
       }
+    } else {
+      // New Order: Load default client (88888888 - PUBLICO GENERAL)
+      await loadDefaultClient()
     }
   } catch (err) {
     if (err?.response?.status === 404) {

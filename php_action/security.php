@@ -190,7 +190,7 @@ function detect_malicious_payload(string $value): ?string
         'sqli_union'         => '/\bunion\s+(?:all\s+)?select\b/i',
         'sqli_outfile'       => '/\binto\s+(?:outfile|dumpfile)\b/i',
         'sqli_timing'        => '/\b(?:sleep|benchmark)\s*\(/i',
-        'path_traversal'     => '/(?:\.\.\/|\.\.\\)/',
+        'path_traversal'     => '/(?:\.\.\/|\.\.\\\\)/',
         'command_injection'  => '/(?:;|&&|\|\|)\s*(?:cat|ls|rm|chmod|chown|wget|curl|bash|sh|nc|python|perl|eval|exec|system|passthru)\b/i',
         'system_probe'       => '/(?:\/etc\/(?:passwd|shadow|hosts)|\/proc\/self)/i',
         'dangerous_protocol' => '/\b(?:gopher|dict|phar|ldap|expect):\/\//i',

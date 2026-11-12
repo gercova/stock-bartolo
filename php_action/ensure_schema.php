@@ -569,9 +569,17 @@ function ensure_app_schema(mysqli $connect): void
         }
     }
 
-    // 11. Loyalty Points Columns on clients table
+    // 11. Extra Columns on clients table
+    sb_ensure_table_column($connect, 'clients', 'birth_date', 'DATE NULL AFTER `last_name`');
+    sb_ensure_table_column($connect, 'clients', 'gender', 'VARCHAR(20) NULL AFTER `birth_date`');
     sb_ensure_table_column($connect, 'clients', 'points_balance', 'INT NOT NULL DEFAULT 0 AFTER `status`');
     sb_ensure_table_column($connect, 'clients', 'lifetime_points', 'INT NOT NULL DEFAULT 0 AFTER `points_balance`');
+
+    // Seed default generic customer (PUBLICO GENERAL)
+    $chkGen = $connect->query("SELECT client_id FROM `clients` WHERE `document_number` = '88888888' OR `name` = 'PUBLICO GENERAL' LIMIT 1");
+    if ($chkGen && $chkGen->num_rows === 0) {
+        $connect->query("INSERT INTO `clients` (`branch_id`, `document_type`, `document_number`, `name`, `first_name`, `last_name`, `client_type`, `status`, `record_status`, `notes`, `created_at`) VALUES (1, 'OTRO', '88888888', 'PUBLICO GENERAL', 'PUBLICO', 'GENERAL', 'client', 1, 1, 'Cliente genérico por defecto para ventas al público.', NOW())");
+    }
 
     // 12. Loyalty and Operations Settings in system_settings
     sb_ensure_table_column($connect, 'system_settings', 'points_ratio_soles', 'DECIMAL(10,2) NOT NULL DEFAULT 10.00 AFTER `allow_branch_switching`');

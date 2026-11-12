@@ -174,6 +174,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  clearOnSelect: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['update:modelValue', 'select', 'clear'])
@@ -260,6 +264,15 @@ async function searchProducts(query) {
 }
 
 function selectProduct(product) {
+  if (props.clearOnSelect) {
+    selectedProduct.value = null
+    isSearching.value = false
+    dropdownOpen.value = false
+    searchTerm.value = ''
+    emit('update:modelValue', 0)
+    emit('select', product)
+    return
+  }
   selectedProduct.value = product
   isSearching.value = false
   dropdownOpen.value = false

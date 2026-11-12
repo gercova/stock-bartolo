@@ -3,7 +3,10 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
 
-sb_assert_permission($connect, 'clients', 'access');
+$userId = (int)($_SESSION['userId'] ?? 0);
+if (!sb_has_permission($connect, $userId, 'clients', 'access') && !sb_has_permission($connect, $userId, 'orders', 'access')) {
+    send_http_error(403, 'No tienes permiso para consultar clientes.');
+}
 
 $search     = trim((string)($_GET['search'] ?? ''));
 $clientType = trim((string)($_GET['client_type'] ?? ''));
@@ -67,6 +70,8 @@ $sql        = "SELECT
             c.name,
             c.first_name,
             c.last_name,
+            c.birth_date,
+            c.gender,
             c.email,
             c.phone,
             c.address,
@@ -76,6 +81,8 @@ $sql        = "SELECT
             c.ubigeo,
             c.client_type,
             c.status,
+            c.points_balance,
+            c.lifetime_points,
             c.record_status,
             c.notes,
             c.created_at,
@@ -106,6 +113,8 @@ while ($row = $res->fetch_assoc()) {
         'name'              => (string)$row['name'],
         'first_name'        => (string)($row['first_name'] ?? ''),
         'last_name'         => (string)($row['last_name'] ?? ''),
+        'birth_date'        => $row['birth_date'] ? (string)$row['birth_date'] : '',
+        'gender'            => (string)($row['gender'] ?? ''),
         'email'             => (string)($row['email'] ?? ''),
         'phone'             => (string)($row['phone'] ?? ''),
         'address'           => (string)($row['address'] ?? ''),
@@ -115,6 +124,8 @@ while ($row = $res->fetch_assoc()) {
         'ubigeo'            => (string)($row['ubigeo'] ?? ''),
         'client_type'       => (string)$row['client_type'],
         'status'            => (int)$row['status'],
+        'points_balance'    => (int)($row['points_balance'] ?? 0),
+        'lifetime_points'   => (int)($row['lifetime_points'] ?? 0),
         'notes'             => (string)($row['notes'] ?? ''),
         'created_at'        => $row['created_at'],
         'updated_at'        => $row['updated_at'],

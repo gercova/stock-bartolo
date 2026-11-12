@@ -8,25 +8,25 @@ import apiClient, {
 import { setActiveCurrency } from '@/utils/formatters'
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref(null)
-  const activeBranch = ref(null)
-  const branches = ref([])
-  const systemConfig = ref(null)
-  const authenticated = ref(false)
-  const checked = ref(false)
-  const loading = ref(false)
-  const switchingBranch = ref(false)
+  const user              = ref(null)
+  const activeBranch      = ref(null)
+  const branches          = ref([])
+  const systemConfig      = ref(null)
+  const authenticated     = ref(false)
+  const checked           = ref(false)
+  const loading           = ref(false)
+  const switchingBranch   = ref(false)
 
   function applyTenantPayload(data) {
     if (data?.activeBranch) {
-      activeBranch.value = data.activeBranch
+      activeBranch.value  = data.activeBranch
       setActiveCurrency(data.activeBranch.currency_code, data.activeBranch.currency_symbol)
     }
     if (Array.isArray(data?.branches)) {
-      branches.value = data.branches
+      branches.value      = data.branches
     }
     if (data?.systemConfig) {
-      systemConfig.value = data.systemConfig
+      systemConfig.value  = data.systemConfig
     }
   }
 
@@ -42,18 +42,18 @@ export const useAuthStore = defineStore('auth', () => {
       if (authenticated.value) {
         applyTenantPayload(data)
       } else {
-        activeBranch.value = null
-        branches.value = []
-        systemConfig.value = null
+        activeBranch.value  = null
+        branches.value      = []
+        systemConfig.value  = null
       }
     } catch {
       authenticated.value = false
-      user.value = null
-      activeBranch.value = null
-      branches.value = []
-      systemConfig.value = null
+      user.value          = null
+      activeBranch.value  = null
+      branches.value      = []
+      systemConfig.value  = null
     } finally {
-      checked.value = true
+      checked.value       = true
     }
     return authenticated.value
   }
@@ -101,12 +101,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   function clearSession() {
     authenticated.value = false
-    user.value = null
-    activeBranch.value = null
-    branches.value = []
-    systemConfig.value = null
+    user.value          = null
+    activeBranch.value  = null
+    branches.value      = []
+    systemConfig.value  = null
     setActiveCurrency('USD', '$')
-    checked.value = true
+    checked.value       = true
   }
 
   const isSuperadmin = computed(() => {
@@ -119,8 +119,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (!perms) return true
     if (perms.is_superadmin) return true
 
-    const act = String(action).toLowerCase().trim()
-    const prop = act === 'create' || act === 'add' ? 'can_create'
+    const act   = String(action).toLowerCase().trim()
+    const prop  = act === 'create' || act === 'add' ? 'can_create'
       : act === 'update' || act === 'edit' ? 'can_update'
       : act === 'delete' || act === 'remove' ? 'can_delete'
       : 'can_access'
