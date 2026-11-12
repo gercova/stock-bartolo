@@ -263,7 +263,54 @@ function ensure_app_schema(mysqli $connect): void
         KEY `idx_login_attempts_ip_updated` (`ip_address`, `updated_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    // 5. Idempotent column upgrades for legacy tables
+    // 5. Security Management: Roles, Role Permissions, and Audit Logs
+    $connect->query("CREATE TABLE IF NOT EXISTS `roles` (
+        `role_id` int(11) NOT NULL AUTO_INCREMENT,
+        `role_name` varchar(100) NOT NULL,
+        `role_slug` varchar(50) NOT NULL,
+        `description` varchar(255) DEFAULT '',
+        `is_system` tinyint(1) NOT NULL DEFAULT 0,
+        `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`role_id`),
+        UNIQUE KEY `uniq_role_slug` (`role_slug`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $connect->query("CREATE TABLE IF NOT EXISTS `role_permissions` (
+        `permission_id` int(11) NOT NULL AUTO_INCREMENT,
+        `role_id` int(11) NOT NULL,
+        `module` varchar(50) NOT NULL,
+        `can_access` tinyint(1) NOT NULL DEFAULT 0,
+        `can_create` tinyint(1) NOT NULL DEFAULT 0,
+        `can_update` tinyint(1) NOT NULL DEFAULT 0,
+        `can_delete` tinyint(1) NOT NULL DEFAULT 0,
+        `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`permission_id`),
+        UNIQUE KEY `uniq_role_module` (`role_id`, `module`),
+        KEY `idx_role_perm_role` (`role_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $connect->query("CREATE TABLE IF NOT EXISTS `audit_logs` (
+        `log_id` int(11) NOT NULL AUTO_INCREMENT,
+        `user_id` int(11) DEFAULT NULL,
+        `username` varchar(100) NOT NULL DEFAULT 'sistema',
+        `branch_id` int(11) DEFAULT NULL,
+        `module` varchar(50) NOT NULL,
+        `action` varchar(50) NOT NULL,
+        `description` varchar(255) NOT NULL,
+        `ip_address` varchar(45) NOT NULL DEFAULT '',
+        `user_agent` varchar(255) DEFAULT '',
+        `details` text DEFAULT NULL,
+        `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`log_id`),
+        KEY `idx_audit_created` (`created_at`),
+        KEY `idx_audit_user` (`user_id`, `created_at`),
+        KEY `idx_audit_module_action` (`module`, `action`),
+        KEY `idx_audit_branch` (`branch_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // 6. Idempotent column upgrades for legacy tables
     $colsMap = sb_load_columns_map($connect);
 
     $branchScopedTables = [
@@ -289,12 +336,31 @@ function ensure_app_schema(mysqli $connect): void
         if (!sb_column_exists($colsMap, 'users', 'role')) {
             $connect->query("ALTER TABLE `users` ADD COLUMN `role` varchar(30) NOT NULL DEFAULT 'superadmin'");
         }
+        if (!sb_column_exists($colsMap, 'users', 'role_id')) {
+            $connect->query("ALTER TABLE `users` ADD COLUMN `role_id` int(11) DEFAULT 1 AFTER `email`");
+            sb_ensure_index($connect, 'users', 'idx_users_role_id', '`role_id`');
+        }
+        if (!sb_column_exists($colsMap, 'users', 'full_name')) {
+            $connect->query("ALTER TABLE `users` ADD COLUMN `full_name` varchar(150) DEFAULT '' AFTER `username`");
+        }
+        if (!sb_column_exists($colsMap, 'users', 'phone')) {
+            $connect->query("ALTER TABLE `users` ADD COLUMN `phone` varchar(60) DEFAULT '' AFTER `email`");
+        }
+        if (!sb_column_exists($colsMap, 'users', 'last_login')) {
+            $connect->query("ALTER TABLE `users` ADD COLUMN `last_login` datetime DEFAULT NULL");
+        }
+        if (!sb_column_exists($colsMap, 'users', 'created_at')) {
+            $connect->query("ALTER TABLE `users` ADD COLUMN `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP");
+        }
+        if (!sb_column_exists($colsMap, 'users', 'updated_at')) {
+            $connect->query("ALTER TABLE `users` ADD COLUMN `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+        }
         if (!sb_column_exists($colsMap, 'users', 'active')) {
             $connect->query("ALTER TABLE `users` ADD COLUMN `active` tinyint(1) NOT NULL DEFAULT 1");
         }
     }
 
-    // 6. Seed baseline tenant #1 & global config atomically if absent
+    // 7. Seed baseline tenant #1 & global config atomically if absent
     $connect->query("INSERT IGNORE INTO `branches`
         (`branch_id`, `branch_code`, `branch_name`, `address`, `phone`, `email`, `manager_name`, `tax_rate`, `currency_code`, `currency_symbol`, `is_main`, `active`, `record_status`)
         VALUES
@@ -317,6 +383,111 @@ function ensure_app_schema(mysqli $connect): void
             VALUES
             (1, 'CAJA-01', 'Caja Principal', 'Mostrador Central', 1, 1)");
     }
+
+    // 8. Seed default roles and permissions if empty
+    $rolesCountRes = $connect->query("SELECT COUNT(*) AS cnt FROM `roles`");
+    if ($rolesCountRes && (int)($rolesCountRes->fetch_assoc()['cnt'] ?? 0) === 0) {
+        $rolesToSeed = [
+            [
+                'role_id' => 1,
+                'name' => 'Superadministrador',
+                'slug' => 'superadmin',
+                'desc' => 'Control absoluto del sistema, todas las sucursales, finanzas y seguridad.',
+                'system' => 1,
+            ],
+            [
+                'role_id' => 2,
+                'name' => 'Administrador',
+                'slug' => 'admin',
+                'desc' => 'Gestión operativa y administrativa completa de inventario, ventas, caja, préstamos y usuarios.',
+                'system' => 1,
+            ],
+            [
+                'role_id' => 3,
+                'name' => 'Supervisor',
+                'slug' => 'supervisor',
+                'desc' => 'Supervisión de operaciones, reportes, arqueos y consulta de auditoría.',
+                'system' => 0,
+            ],
+            [
+                'role_id' => 4,
+                'name' => 'Cajero',
+                'slug' => 'cashier',
+                'desc' => 'Operación de ventas en mostrador, turnos de caja y cobro de cuotas de préstamos.',
+                'system' => 0,
+            ],
+            [
+                'role_id' => 5,
+                'name' => 'Vendedor',
+                'slug' => 'seller',
+                'desc' => 'Consulta de productos y emisión de órdenes de venta.',
+                'system' => 0,
+            ],
+        ];
+
+        foreach ($rolesToSeed as $r) {
+            $stmt = $connect->prepare("INSERT INTO `roles` (`role_id`, `role_name`, `role_slug`, `description`, `is_system`) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param('isssi', $r['role_id'], $r['name'], $r['slug'], $r['desc'], $r['system']);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $allModules = [
+            'dashboard', 'brands', 'categories', 'products', 'orders',
+            'cash_register', 'loans', 'reports', 'general_cash', 'branches',
+            'system_config', 'users', 'roles', 'audit_logs'
+        ];
+
+        // Permissions definitions for each role: [access, create, update, delete]
+        $rolePermPresets = [
+            1 => [ // superadmin: all 1
+                'dashboard' => [1,1,1,1], 'brands' => [1,1,1,1], 'categories' => [1,1,1,1], 'products' => [1,1,1,1],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'reports' => [1,1,1,1],
+                'general_cash' => [1,1,1,1], 'branches' => [1,1,1,1], 'system_config' => [1,1,1,1],
+                'users' => [1,1,1,1], 'roles' => [1,1,1,1], 'audit_logs' => [1,1,1,1]
+            ],
+            2 => [ // admin
+                'dashboard' => [1,0,0,0], 'brands' => [1,1,1,1], 'categories' => [1,1,1,1], 'products' => [1,1,1,1],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'reports' => [1,0,0,0],
+                'general_cash' => [1,1,1,1], 'branches' => [1,1,1,0], 'system_config' => [1,0,1,0],
+                'users' => [1,1,1,1], 'roles' => [1,1,1,0], 'audit_logs' => [1,0,0,0]
+            ],
+            3 => [ // supervisor
+                'dashboard' => [1,0,0,0], 'brands' => [1,1,1,0], 'categories' => [1,1,1,0], 'products' => [1,1,1,0],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,0], 'loans' => [1,1,1,0], 'reports' => [1,0,0,0],
+                'general_cash' => [1,0,0,0], 'branches' => [1,0,0,0], 'system_config' => [0,0,0,0],
+                'users' => [1,0,0,0], 'roles' => [1,0,0,0], 'audit_logs' => [1,0,0,0]
+            ],
+            4 => [ // cashier
+                'dashboard' => [1,0,0,0], 'brands' => [1,0,0,0], 'categories' => [1,0,0,0], 'products' => [1,0,0,0],
+                'orders' => [1,1,1,0], 'cash_register' => [1,1,1,0], 'loans' => [1,0,1,0], 'reports' => [0,0,0,0],
+                'general_cash' => [0,0,0,0], 'branches' => [0,0,0,0], 'system_config' => [0,0,0,0],
+                'users' => [0,0,0,0], 'roles' => [0,0,0,0], 'audit_logs' => [0,0,0,0]
+            ],
+            5 => [ // seller
+                'dashboard' => [1,0,0,0], 'brands' => [1,0,0,0], 'categories' => [1,0,0,0], 'products' => [1,0,0,0],
+                'orders' => [1,1,0,0], 'cash_register' => [0,0,0,0], 'loans' => [1,0,0,0], 'reports' => [0,0,0,0],
+                'general_cash' => [0,0,0,0], 'branches' => [0,0,0,0], 'system_config' => [0,0,0,0],
+                'users' => [0,0,0,0], 'roles' => [0,0,0,0], 'audit_logs' => [0,0,0,0]
+            ],
+        ];
+
+        foreach ($rolePermPresets as $rId => $pMap) {
+            foreach ($allModules as $mod) {
+                $a = $pMap[$mod][0] ?? 0;
+                $c = $pMap[$mod][1] ?? 0;
+                $u = $pMap[$mod][2] ?? 0;
+                $d = $pMap[$mod][3] ?? 0;
+                $insP = $connect->prepare("INSERT INTO `role_permissions` (`role_id`, `module`, `can_access`, `can_create`, `can_update`, `can_delete`) VALUES (?, ?, ?, ?, ?, ?)");
+                $insP->bind_param('isiiii', $rId, $mod, $a, $c, $u, $d);
+                $insP->execute();
+                $insP->close();
+            }
+        }
+    }
+
+    // 9. Attach admin user to role #1 and set full_name
+    $connect->query("UPDATE `users` SET `role_id` = 1, `full_name` = 'Administrador Principal' WHERE `user_id` = 1 AND (`role_id` IS NULL OR `role_id` = 0 OR `full_name` = '' OR `full_name` IS NULL)");
 }
 
 function ensure_loan_schema(mysqli $connect): void

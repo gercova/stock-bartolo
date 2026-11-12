@@ -3,10 +3,10 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
 
-$branchId = get_active_branch_id($connect);
-$data = array_merge($_GET, get_request_data());
-$startDate = validate_iso_date($data['startDate'] ?? '', 'fecha inicial', true);
-$endDate = validate_iso_date($data['endDate'] ?? '', 'fecha final', true);
+$branchId   = get_active_branch_id($connect);
+$data       = array_merge($_GET, get_request_data());
+$startDate  = validate_iso_date($data['startDate'] ?? '', 'fecha inicial', true);
+$endDate    = validate_iso_date($data['endDate'] ?? '', 'fecha final', true);
 
 if ($startDate > $endDate) {
     send_http_error(400, 'La fecha inicial no puede ser posterior a la fecha final.');

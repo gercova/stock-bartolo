@@ -3,17 +3,17 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
-$branchId = get_active_branch_id($connect);
-$userId = (int)$_SESSION['userId'];
-$data = get_request_data();
+$branchId   = get_active_branch_id($connect);
+$userId     = (int)$_SESSION['userId'];
+$data       = get_request_data();
 
-$sessionId = (int)($data['sessionId'] ?? 0);
-$rawCounted = (float)($data['countedCash'] ?? 0);
-$cardReported = round(max(0, (float)($data['cardReported'] ?? 0)), 2);
-$transferReported = round(max(0, (float)($data['transferReported'] ?? 0)), 2);
-$checkReported = round(max(0, (float)($data['checkReported'] ?? 0)), 2);
-$denominations = isset($data['denominations']) && is_array($data['denominations']) ? $data['denominations'] : null;
-$notes = sanitize_clean_text($data['notes'] ?? '', 'notas de arqueo', 255, false);
+$sessionId          = (int)($data['sessionId'] ?? 0);
+$rawCounted         = (float)($data['countedCash'] ?? 0);
+$cardReported       = round(max(0, (float)($data['cardReported'] ?? 0)), 2);
+$transferReported   = round(max(0, (float)($data['transferReported'] ?? 0)), 2);
+$checkReported      = round(max(0, (float)($data['checkReported'] ?? 0)), 2);
+$denominations      = isset($data['denominations']) && is_array($data['denominations']) ? $data['denominations'] : null;
+$notes              = sanitize_clean_text($data['notes'] ?? '', 'notas de arqueo', 255, false);
 
 if ($sessionId <= 0 || $rawCounted < 0) {
     send_http_error(400, 'Datos inválidos para ejecutar el arqueo de caja.');
@@ -35,12 +35,12 @@ try {
         throw new InvalidArgumentException('Solo se puede realizar arqueo sobre una caja abierta.');
     }
 
-    $countedInfo = sb_compute_counted_from_denominations($denominations, $rawCounted);
-    $countedCash = $countedInfo['counted'];
-    $denomJson = $countedInfo['json'];
+    $countedInfo    = sb_compute_counted_from_denominations($denominations, $rawCounted);
+    $countedCash    = $countedInfo['counted'];
+    $denomJson      = $countedInfo['json'];
 
-    $expectedCash = round((float)$sess['opening_amount'] + (float)$sess['cash_in_total'] - (float)$sess['cash_out_total'], 2);
-    $difference = round($countedCash - $expectedCash, 2);
+    $expectedCash   = round((float)$sess['opening_amount'] + (float)$sess['cash_in_total'] - (float)$sess['cash_out_total'], 2);
+    $difference     = round($countedCash - $expectedCash, 2);
 
     if (abs($difference) < 0.005) {
         $difference = 0.00;
@@ -68,14 +68,14 @@ try {
     $connect->close();
 
     json_response([
-        'success' => true,
-        'messages' => 'Arqueo de caja registrado exitosamente',
+        'success'   => true,
+        'messages'  => 'Arqueo de caja registrado exitosamente',
         'reconciliation' => [
             'reconciliation_id' => $recId,
-            'expected_cash' => $expectedCash,
-            'counted_cash' => $countedCash,
+            'expected_cash'     => $expectedCash,
+            'counted_cash'      => $countedCash,
             'difference_amount' => $difference,
-            'status_label' => $statusLabel,
+            'status_label'      => $statusLabel,
         ],
     ], 201);
 } catch (InvalidArgumentException $e) {

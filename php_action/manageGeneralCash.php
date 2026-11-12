@@ -7,8 +7,8 @@ $userId = (int)$_SESSION['userId'];
 $canSwitch = sb_user_can_switch_branches($connect, $userId);
 $activeBranchId = get_active_branch_id($connect);
 
-$data = get_request_data();
-$action = sanitize_clean_text($data['action'] ?? 'add_movement', 'acción', 40, true);
+$data           = get_request_data();
+$action         = sanitize_clean_text($data['action'] ?? 'add_movement', 'acción', 40, true);
 $targetBranchId = !empty($data['branchId']) ? (int)$data['branchId'] : $activeBranchId;
 
 if ($targetBranchId !== $activeBranchId && !$canSwitch) {
@@ -30,10 +30,10 @@ if (!$branchRow) {
 sb_ensure_branch_cash_defaults($connect, $targetBranchId, (string)$branchRow['branch_name'], 0.0, $userId);
 
 if ($action === 'update_account') {
-    $accountName = sanitize_clean_text($data['accountName'] ?? '', 'nombre de Caja General', 150, true);
-    $minBalanceAlert = round((float)($data['minBalanceAlert'] ?? 0), 2);
-    $status = (int)($data['status'] ?? 1);
-    $notes = sanitize_clean_text($data['notes'] ?? '', 'notas', 255, false);
+    $accountName        = sanitize_clean_text($data['accountName'] ?? '', 'nombre de Caja General', 150, true);
+    $minBalanceAlert    = round((float)($data['minBalanceAlert'] ?? 0), 2);
+    $status             = (int)($data['status'] ?? 1);
+    $notes              = sanitize_clean_text($data['notes'] ?? '', 'notas', 255, false);
 
     if ($minBalanceAlert < 0 || !in_array($status, [1, 2], true)) {
         $connect->close();
@@ -51,15 +51,15 @@ if ($action === 'update_account') {
     $connect->close();
 
     json_response([
-        'success' => true,
-        'messages' => 'Configuración de Caja General actualizada exitosamente',
+        'success'   => true,
+        'messages'  => 'Configuración de Caja General actualizada exitosamente',
     ]);
 }
 
 if ($action === 'update_movement') {
-    $movementId = (int)($data['movementId'] ?? 0);
-    $reference = sanitize_clean_text($data['reference'] ?? '', 'referencia', 100, false);
-    $description = sanitize_clean_text($data['description'] ?? '', 'descripción', 255, true);
+    $movementId     = (int)($data['movementId'] ?? 0);
+    $reference      = sanitize_clean_text($data['reference'] ?? '', 'referencia', 100, false);
+    $description    = sanitize_clean_text($data['description'] ?? '', 'descripción', 255, true);
 
     if ($movementId <= 0) {
         $connect->close();
@@ -89,8 +89,8 @@ if ($action === 'update_movement') {
     $connect->close();
 
     json_response([
-        'success' => true,
-        'messages' => 'Detalle de movimiento actualizado',
+        'success'   => true,
+        'messages'  => 'Detalle de movimiento actualizado',
     ]);
 }
 
@@ -103,16 +103,16 @@ if ($action === 'void_movement') {
 
     $connect->begin_transaction();
     try {
-        $accStmt = $connect->prepare('SELECT account_id, current_balance FROM general_cash_accounts WHERE branch_id = ? LIMIT 1 FOR UPDATE');
+        $accStmt    = $connect->prepare('SELECT account_id, current_balance FROM general_cash_accounts WHERE branch_id = ? LIMIT 1 FOR UPDATE');
         $accStmt->bind_param('i', $targetBranchId);
         $accStmt->execute();
-        $acc = $accStmt->get_result()->fetch_assoc();
+        $acc        = $accStmt->get_result()->fetch_assoc();
         $accStmt->close();
 
-        $mStmt = $connect->prepare('SELECT * FROM general_cash_movements WHERE movement_id = ? AND branch_id = ? AND record_status = 1 LIMIT 1 FOR UPDATE');
+        $mStmt      = $connect->prepare('SELECT * FROM general_cash_movements WHERE movement_id = ? AND branch_id = ? AND record_status = 1 LIMIT 1 FOR UPDATE');
         $mStmt->bind_param('ii', $movementId, $targetBranchId);
         $mStmt->execute();
-        $mov = $mStmt->get_result()->fetch_assoc();
+        $mov        = $mStmt->get_result()->fetch_assoc();
         $mStmt->close();
 
         if (!$acc || !$mov) {
@@ -123,8 +123,8 @@ if ($action === 'void_movement') {
             throw new InvalidArgumentException('No se pueden anular movimientos vinculados a sesiones de caja.');
         }
 
-        $currBal = round((float)$acc['current_balance'], 2);
-        $amt = round((float)$mov['amount'], 2);
+        $currBal    = round((float)$acc['current_balance'], 2);
+        $amt        = round((float)$mov['amount'], 2);
 
         if ($mov['direction'] === 'in') {
             if ($currBal < $amt) {
@@ -173,11 +173,11 @@ if ($action === 'add_movement') {
     $description = sanitize_clean_text($data['description'] ?? '', 'descripción', 255, true);
 
     $allowed = [
-        'initial_capital' => 'in',
-        'deposit' => 'in',
-        'adjustment_in' => 'in',
-        'withdrawal' => 'out',
-        'adjustment_out' => 'out',
+        'initial_capital'   => 'in',
+        'deposit'           => 'in',
+        'adjustment_in'     => 'in',
+        'withdrawal'        => 'out',
+        'adjustment_out'    => 'out',
     ];
 
     if (!isset($allowed[$movementType]) || $amount <= 0) {

@@ -3,9 +3,9 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'DELETE']);
 
-$branchId = get_active_branch_id($connect);
-$data = array_merge($_GET, get_request_data());
-$categoriesId = (int)($data['categoriesId'] ?? $data['id'] ?? 0);
+$branchId       = get_active_branch_id($connect);
+$data           = array_merge($_GET, get_request_data());
+$categoriesId   = (int)($data['categoriesId'] ?? $data['id'] ?? 0);
 
 if ($categoriesId <= 0) {
     send_http_error(400, 'ID de categoría inválido.');

@@ -55,14 +55,14 @@ if ((int)($_SESSION['active_branch_id'] ?? 1) === $branchId) {
     $_SESSION['active_branch_id'] = 1;
 }
 
-$activeBranch = get_active_branch($connect);
-$accessible = sb_get_accessible_branches($connect);
+$activeBranch   = get_active_branch($connect);
+$accessible     = sb_get_accessible_branches($connect);
 $connect->close();
 
 json_response([
-    'success' => true,
-    'messages' => 'Sucursal eliminada exitosamente',
-    'activeBranch' => $activeBranch,
-    'branches' => $accessible,
+    'success'       => true,
+    'messages'      => 'Sucursal eliminada exitosamente',
+    'activeBranch'  => $activeBranch,
+    'branches'      => $accessible,
 ]);
 

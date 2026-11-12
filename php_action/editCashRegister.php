@@ -3,14 +3,14 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
 
-$branchId = get_active_branch_id($connect);
-$data = get_request_data();
+$branchId   = get_active_branch_id($connect);
+$data       = get_request_data();
 
-$registerId = (int)($data['registerId'] ?? 0);
-$registerCode = strtoupper(preg_replace('/[^A-Za-z0-9\-_]/', '', sanitize_clean_text($data['registerCode'] ?? '', 'código de caja', 32, true)));
-$registerName = sanitize_clean_text($data['registerName'] ?? '', 'nombre de caja', 120, true);
-$location = sanitize_clean_text($data['location'] ?? '', 'ubicación', 150, false);
-$active = (int)($data['active'] ?? 1);
+$registerId     = (int)($data['registerId'] ?? 0);
+$registerCode   = strtoupper(preg_replace('/[^A-Za-z0-9\-_]/', '', sanitize_clean_text($data['registerCode'] ?? '', 'código de caja', 32, true)));
+$registerName   = sanitize_clean_text($data['registerName'] ?? '', 'nombre de caja', 120, true);
+$location       = sanitize_clean_text($data['location'] ?? '', 'ubicación', 150, false);
+$active         = (int)($data['active'] ?? 1);
 
 if ($registerId <= 0 || $registerCode === '' || !in_array($active, [1, 2], true)) {
     send_http_error(400, 'Datos inválidos para actualizar la caja registradora.');

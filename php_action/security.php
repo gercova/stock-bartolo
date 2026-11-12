@@ -83,11 +83,11 @@ function issue_csrf_cookie(?string $token = null): string
     $value = $token ?? ensure_csrf_token();
     if (!headers_sent()) {
         setcookie('XSRF-TOKEN', $value, [
-            'expires' => 0,
-            'path' => '/',
-            'secure' => is_https_request(),
-            'httponly' => false,
-            'samesite' => 'Lax',
+            'expires'   => 0,
+            'path'      => '/',
+            'secure'    => is_https_request(),
+            'httponly'  => false,
+            'samesite'  => 'Lax',
         ]);
     }
     return $value;
@@ -115,8 +115,8 @@ function verify_csrf_token(?array $bodyData = null): void
         return;
     }
 
-    $sessionToken = $_SESSION['csrf_token'] ?? '';
-    $incoming = extract_incoming_csrf_token($bodyData);
+    $sessionToken   = $_SESSION['csrf_token'] ?? '';
+    $incoming       = extract_incoming_csrf_token($bodyData);
 
     if ($incoming === '' && empty($_POST) && $bodyData === null) {
         $raw = file_get_contents('php://input');
@@ -144,16 +144,16 @@ function detect_malicious_payload(string $value): ?string
     }
 
     $patterns = [
-        'script_tag' => '/<\s*\/?\s*script\b/i',
-        'php_tag' => '/<\?(?:php|=|\s)/i',
+        'script_tag'    => '/<\s*\/?\s*script\b/i',
+        'php_tag'       => '/<\?(?:php|=|\s)/i',
         'dangerous_tag' => '/<\s*(?:iframe|object|embed|applet|meta|base)\b/i',
-        'svg_event' => '/<\s*svg\b[^>]*\bon[a-z]+\s*=/i',
-        'script_uri' => '/(?:javascript|vbscript)\s*:/i',
+        'svg_event'     => '/<\s*svg\b[^>]*\bon[a-z]+\s*=/i',
+        'script_uri'    => '/(?:javascript|vbscript)\s*:/i',
         'data_html_uri' => '/data\s*:\s*text\/html/i',
         'inline_handler' => '/\bon(?:abort|blur|change|click|dblclick|error|focus|input|keydown|keypress|keyup|load|mousedown|mouseenter|mouseleave|mousemove|mouseout|mouseover|mouseup|reset|resize|select|submit|unload)\s*=/i',
-        'sqli_union' => '/\bunion\s+(?:all\s+)?select\b/i',
-        'sqli_outfile' => '/\binto\s+(?:outfile|dumpfile)\b/i',
-        'sqli_timing' => '/\b(?:sleep|benchmark)\s*\(/i',
+        'sqli_union'    => '/\bunion\s+(?:all\s+)?select\b/i',
+        'sqli_outfile'  => '/\binto\s+(?:outfile|dumpfile)\b/i',
+        'sqli_timing'   => '/\b(?:sleep|benchmark)\s*\(/i',
     ];
 
     foreach ($patterns as $name => $regex) {
@@ -290,8 +290,8 @@ function check_login_rate_limit(mysqli $connect, string $ip, string $username): 
 {
     ensure_app_schema($connect);
 
-    $maxIpAttempts = 15;
-    $windowSeconds = 900;
+    $maxIpAttempts  = 15;
+    $windowSeconds  = 900;
     $normalizedUser = mb_strtolower($username, 'UTF-8');
 
     $stmt = $connect->prepare('SELECT attempts, UNIX_TIMESTAMP(first_attempt_at) AS first_ts, UNIX_TIMESTAMP(locked_until) AS locked_ts FROM login_attempts WHERE ip_address = ? AND username = ? LIMIT 1');
@@ -340,17 +340,17 @@ function record_failed_login(mysqli $connect, string $ip, string $username): arr
 {
     ensure_app_schema($connect);
 
-    $maxAttempts = 5;
-    $windowSeconds = 900;
-    $lockSeconds = 900;
+    $maxAttempts    = 5;
+    $windowSeconds  = 900;
+    $lockSeconds    = 900;
     $normalizedUser = mb_strtolower($username, 'UTF-8');
-    $now = time();
-    $nowStr = date('Y-m-d H:i:s', $now);
+    $now            = time();
+    $nowStr         = date('Y-m-d H:i:s', $now);
 
     $connect->query("DELETE FROM login_attempts WHERE updated_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
 
-    $stmt = $connect->prepare('SELECT attempt_id, attempts, UNIX_TIMESTAMP(first_attempt_at) AS first_ts FROM login_attempts WHERE ip_address = ? AND username = ? LIMIT 1');
-    $row = null;
+    $stmt   = $connect->prepare('SELECT attempt_id, attempts, UNIX_TIMESTAMP(first_attempt_at) AS first_ts FROM login_attempts WHERE ip_address = ? AND username = ? LIMIT 1');
+    $row    = null;
     if ($stmt) {
         $stmt->bind_param('ss', $ip, $normalizedUser);
         $stmt->execute();
@@ -370,11 +370,11 @@ function record_failed_login(mysqli $connect, string $ip, string $username): arr
         return ['attempts' => 1, 'remaining' => $maxAttempts - 1, 'locked' => false, 'retryAfter' => 0];
     }
 
-    $withinWindow = ($now - (int)$row['first_ts']) <= $windowSeconds;
-    $attempts = $withinWindow ? ((int)$row['attempts'] + 1) : 1;
-    $firstAt = $withinWindow ? date('Y-m-d H:i:s', (int)$row['first_ts']) : $nowStr;
-    $locked = $attempts >= $maxAttempts;
-    $lockedUntil = $locked ? date('Y-m-d H:i:s', $now + $lockSeconds) : null;
+    $withinWindow   = ($now - (int)$row['first_ts']) <= $windowSeconds;
+    $attempts       = $withinWindow ? ((int)$row['attempts'] + 1) : 1;
+    $firstAt        = $withinWindow ? date('Y-m-d H:i:s', (int)$row['first_ts']) : $nowStr;
+    $locked         = $attempts >= $maxAttempts;
+    $lockedUntil    = $locked ? date('Y-m-d H:i:s', $now + $lockSeconds) : null;
 
     $upd = $connect->prepare('UPDATE login_attempts SET attempts = ?, first_attempt_at = ?, locked_until = ? WHERE attempt_id = ?');
     if ($upd) {
@@ -385,9 +385,9 @@ function record_failed_login(mysqli $connect, string $ip, string $username): arr
     }
 
     return [
-        'attempts' => $attempts,
+        'attempts'  => $attempts,
         'remaining' => max(0, $maxAttempts - $attempts),
-        'locked' => $locked,
+        'locked'    => $locked,
         'retryAfter' => $locked ? $lockSeconds : 0,
     ];
 }
@@ -426,14 +426,14 @@ function process_uploaded_product_image(array $file): string
     }
 
     $mimeMap = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/gif' => 'gif',
-        'image/webp' => 'webp',
+        'image/jpeg'    => 'jpg',
+        'image/png'     => 'png',
+        'image/gif'     => 'gif',
+        'image/webp'    => 'webp',
     ];
 
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $detectedMime = $finfo->file($tmpName);
+    $finfo          = new finfo(FILEINFO_MIME_TYPE);
+    $detectedMime   = $finfo->file($tmpName);
     if (!is_string($detectedMime) || !isset($mimeMap[$detectedMime])) {
         send_http_error(400, 'El archivo subido no corresponde a una imagen válida.');
     }

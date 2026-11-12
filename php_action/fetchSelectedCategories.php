@@ -3,9 +3,9 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
 
-$branchId = get_active_branch_id($connect);
-$data = array_merge($_GET, get_request_data());
-$categoriesId = (int)($data['categoriesId'] ?? $data['id'] ?? 0);
+$branchId       = get_active_branch_id($connect);
+$data           = array_merge($_GET, get_request_data());
+$categoriesId   = (int)($data['categoriesId'] ?? $data['id'] ?? 0);
 
 if ($categoriesId <= 0) {
     send_http_error(400, 'ID de categoría inválido.');
@@ -26,9 +26,9 @@ if (!$row) {
 json_response([
     'success' => true,
     'data' => [
-        'categories_id' => (int)$row['categories_id'],
-        'branch_id' => (int)$row['branch_id'],
-        'categories_name' => $row['categories_name'],
+        'categories_id'     => (int)$row['categories_id'],
+        'branch_id'         => (int)$row['branch_id'],
+        'categories_name'   => $row['categories_name'],
         'categories_active' => (int)$row['categories_active'],
         'categories_status' => (int)$row['categories_status'],
     ],

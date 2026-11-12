@@ -30,6 +30,15 @@ if (!$row) {
 $_SESSION['active_branch_id'] = (int)$row['branch_id'];
 sb_ensure_branch_cash_defaults($connect, (int)$row['branch_id'], (string)$row['branch_name'], 0.0, $userId);
 
+sb_log_audit(
+    $connect,
+    'branches',
+    'SWITCH_BRANCH',
+    "Cambio de sucursal activa a '{$row['branch_name']}' (#{$row['branch_id']})",
+    ['branch_id' => (int)$row['branch_id'], 'branch_code' => $row['branch_code'], 'branch_name' => $row['branch_name']],
+    (int)$row['branch_id']
+);
+
 $activeBranch = sb_format_branch_row($row);
 $accessible = sb_get_accessible_branches($connect);
 $systemConfig = sb_get_system_config($connect);

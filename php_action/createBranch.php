@@ -9,17 +9,17 @@ if (!sb_user_can_switch_branches($connect, $userId)) {
     send_http_error(403, 'No tienes permisos para crear sucursales.');
 }
 
-$data = get_request_data();
-$branchName = sanitize_clean_text($data['branchName'] ?? '', 'nombre de la sucursal', 150, true);
-$rawCode = sanitize_clean_text($data['branchCode'] ?? '', 'código de sucursal', 32, false);
-$address = sanitize_clean_text($data['address'] ?? '', 'dirección', 255, false);
-$phone = sanitize_clean_text($data['phone'] ?? '', 'teléfono', 60, false);
-$email = sanitize_clean_text($data['email'] ?? '', 'correo electrónico', 120, false);
-$managerName = sanitize_clean_text($data['managerName'] ?? '', 'responsable', 120, false);
-$taxRate = round((float)($data['taxRate'] ?? 13.00), 2);
-$currencyCode = strtoupper(sanitize_clean_text($data['currencyCode'] ?? 'USD', 'código de moneda', 10, true));
+$data           = get_request_data();
+$branchName     = sanitize_clean_text($data['branchName'] ?? '', 'nombre de la sucursal', 150, true);
+$rawCode        = sanitize_clean_text($data['branchCode'] ?? '', 'código de sucursal', 32, false);
+$address        = sanitize_clean_text($data['address'] ?? '', 'dirección', 255, false);
+$phone          = sanitize_clean_text($data['phone'] ?? '', 'teléfono', 60, false);
+$email          = sanitize_clean_text($data['email'] ?? '', 'correo electrónico', 120, false);
+$managerName    = sanitize_clean_text($data['managerName'] ?? '', 'responsable', 120, false);
+$taxRate        = round((float)($data['taxRate'] ?? 13.00), 2);
+$currencyCode   = strtoupper(sanitize_clean_text($data['currencyCode'] ?? 'USD', 'código de moneda', 10, true));
 $currencySymbol = sanitize_clean_text($data['currencySymbol'] ?? '$', 'símbolo de moneda', 8, true);
-$active = (int)($data['active'] ?? 1);
+$active         = (int)($data['active'] ?? 1);
 $initialCapital = round((float)($data['initialCapital'] ?? 0), 2);
 
 if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
@@ -40,8 +40,8 @@ if (!in_array($active, [1, 2], true)) {
 
 $branchCode = $rawCode !== '' ? strtoupper(preg_replace('/[^A-Za-z0-9\-_]/', '', $rawCode)) : '';
 if ($branchCode === '') {
-    $cntRes = $connect->query('SELECT COALESCE(MAX(branch_id), 0) + 1 AS next_id FROM branches');
-    $nextNum = (int)($cntRes ? ($cntRes->fetch_assoc()['next_id'] ?? 1) : 1);
+    $cntRes     = $connect->query('SELECT COALESCE(MAX(branch_id), 0) + 1 AS next_id FROM branches');
+    $nextNum    = (int)($cntRes ? ($cntRes->fetch_assoc()['next_id'] ?? 1) : 1);
     $branchCode = sprintf('SUC-%03d', $nextNum);
 }
 
@@ -71,11 +71,11 @@ try {
     $connect->close();
 
     json_response([
-        'success' => true,
-        'messages' => 'Sucursal creada con Caja General y Caja Registradora independientes',
-        'branch_id' => $newBranchId,
-        'branch_code' => $branchCode,
-        'branches' => $accessible,
+        'success'       => true,
+        'messages'      => 'Sucursal creada con Caja General y Caja Registradora independientes',
+        'branch_id'     => $newBranchId,
+        'branch_code'   => $branchCode,
+        'branches'      => $accessible,
     ], 201);
 } catch (Throwable $e) {
     $connect->rollback();

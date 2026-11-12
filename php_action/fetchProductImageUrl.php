@@ -3,8 +3,8 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
 
-$branchId = get_active_branch_id($connect);
-$productId = (int)($_GET['i'] ?? $_GET['productId'] ?? $_POST['productId'] ?? 0);
+$branchId   = get_active_branch_id($connect);
+$productId  = (int)($_GET['i'] ?? $_GET['productId'] ?? $_POST['productId'] ?? 0);
 if ($productId <= 0) {
     send_http_error(400, 'ID de producto inválido.');
 }

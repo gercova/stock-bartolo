@@ -3,10 +3,10 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
 
-$data = get_request_data();
-$username = sanitize_clean_text($data['username'] ?? '', 'nombre de usuario', 120, true);
-$requestedUserId = (int)($data['user_id'] ?? $_SESSION['userId']);
-$sessionUserId = (int)$_SESSION['userId'];
+$data               = get_request_data();
+$username           = sanitize_clean_text($data['username'] ?? '', 'nombre de usuario', 120, true);
+$requestedUserId    = (int)($data['user_id'] ?? $_SESSION['userId']);
+$sessionUserId      = (int)$_SESSION['userId'];
 
 if ($requestedUserId !== $sessionUserId) {
     send_http_error(403, 'No tienes permisos para modificar el nombre de usuario de otra cuenta.');
@@ -41,7 +41,7 @@ $stmt->close();
 $connect->close();
 
 json_response([
-    'success' => true,
-    'messages' => 'Nombre de usuario actualizado exitosamente',
-    'username' => $username,
+    'success'   => true,
+    'messages'  => 'Nombre de usuario actualizado exitosamente',
+    'username'  => $username,
 ]);

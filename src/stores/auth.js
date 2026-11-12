@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import apiClient, {
   clearCsrfToken,
   extractErrorMessage,
@@ -109,6 +109,25 @@ export const useAuthStore = defineStore('auth', () => {
     checked.value = true
   }
 
+  const isSuperadmin = computed(() => {
+    return Boolean(user.value?.permissions?.is_superadmin || user.value?.role === 'superadmin')
+  })
+
+  function can(module, action = 'access') {
+    if (!user.value) return false
+    const perms = user.value.permissions
+    if (!perms) return true
+    if (perms.is_superadmin) return true
+
+    const act = String(action).toLowerCase().trim()
+    const prop = act === 'create' || act === 'add' ? 'can_create'
+      : act === 'update' || act === 'edit' ? 'can_update'
+      : act === 'delete' || act === 'remove' ? 'can_delete'
+      : 'can_access'
+
+    return Boolean(perms.modules?.[module]?.[prop])
+  }
+
   async function updateUsername(username) {
     const { data } = await apiClient.post('/changeUsername.php', {
       username,
@@ -138,6 +157,8 @@ export const useAuthStore = defineStore('auth', () => {
     checked,
     loading,
     switchingBranch,
+    isSuperadmin,
+    can,
     applyTenantPayload,
     checkAuth,
     login,

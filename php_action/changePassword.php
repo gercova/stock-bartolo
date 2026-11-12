@@ -56,6 +56,15 @@ if (!$updStmt->execute()) {
 }
 
 $updStmt->close();
+
+sb_log_audit(
+    $connect,
+    'users',
+    'PASSWORD_CHANGE',
+    "Cambio de contraseña exitoso del usuario '{$_SESSION['username']}'",
+    ['user_id' => $sessionUserId]
+);
+
 $connect->close();
 
 session_regenerate_id(true);

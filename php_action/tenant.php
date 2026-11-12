@@ -43,20 +43,20 @@ function sb_get_system_config(mysqli $connect): array
 function sb_format_branch_row(array $row): array
 {
     return [
-        'branch_id' => (int)$row['branch_id'],
-        'branch_code' => (string)$row['branch_code'],
-        'branch_name' => (string)$row['branch_name'],
-        'address' => (string)($row['address'] ?? ''),
-        'phone' => (string)($row['phone'] ?? ''),
-        'email' => (string)($row['email'] ?? ''),
-        'manager_name' => (string)($row['manager_name'] ?? ''),
-        'tax_rate' => round((float)($row['tax_rate'] ?? 13.0), 2),
+        'branch_id'     => (int)$row['branch_id'],
+        'branch_code'   => (string)$row['branch_code'],
+        'branch_name'   => (string)$row['branch_name'],
+        'address'       => (string)($row['address'] ?? ''),
+        'phone'         => (string)($row['phone'] ?? ''),
+        'email'         => (string)($row['email'] ?? ''),
+        'manager_name'  => (string)($row['manager_name'] ?? ''),
+        'tax_rate'      => round((float)($row['tax_rate'] ?? 13.0), 2),
         'currency_code' => (string)($row['currency_code'] ?? 'USD'),
         'currency_symbol' => (string)($row['currency_symbol'] ?? '$'),
-        'is_main' => ((int)($row['is_main'] ?? 0)) === 1,
-        'active' => (int)($row['active'] ?? 1),
+        'is_main'       => ((int)($row['is_main'] ?? 0)) === 1,
+        'active'        => (int)($row['active'] ?? 1),
         'record_status' => (int)($row['record_status'] ?? 1),
-        'created_at' => $row['created_at'] ?? null,
+        'created_at'    => $row['created_at'] ?? null,
     ];
 }
 
@@ -108,17 +108,17 @@ function get_active_branch_id(mysqli $connect): int
     }
 
     // Fallback to main or first active branch
-    $fallbackRes = $connect->query('SELECT branch_id FROM branches WHERE record_status = 1 AND active = 1 ORDER BY is_main DESC, branch_id ASC LIMIT 1');
-    $fallbackRow = $fallbackRes ? $fallbackRes->fetch_assoc() : null;
-    $resolved = $fallbackRow ? (int)$fallbackRow['branch_id'] : 1;
+    $fallbackRes    = $connect->query('SELECT branch_id FROM branches WHERE record_status = 1 AND active = 1 ORDER BY is_main DESC, branch_id ASC LIMIT 1');
+    $fallbackRow    = $fallbackRes ? $fallbackRes->fetch_assoc() : null;
+    $resolved       = $fallbackRow ? (int)$fallbackRow['branch_id'] : 1;
     $_SESSION['active_branch_id'] = $resolved;
     return $resolved;
 }
 
 function get_active_branch(mysqli $connect): array
 {
-    $branchId = get_active_branch_id($connect);
-    $stmt = $connect->prepare('SELECT * FROM branches WHERE branch_id = ? AND record_status = 1 LIMIT 1');
+    $branchId   = get_active_branch_id($connect);
+    $stmt       = $connect->prepare('SELECT * FROM branches WHERE branch_id = ? AND record_status = 1 LIMIT 1');
     if ($stmt) {
         $stmt->bind_param('i', $branchId);
         $stmt->execute();
@@ -130,18 +130,18 @@ function get_active_branch(mysqli $connect): array
     }
 
     return [
-        'branch_id' => 1,
-        'branch_code' => 'SUC-001',
-        'branch_name' => 'Sucursal Principal',
-        'address' => '',
-        'phone' => '',
-        'email' => '',
-        'manager_name' => '',
-        'tax_rate' => 13.0,
+        'branch_id'     => 1,
+        'branch_code'   => 'SUC-001',
+        'branch_name'   => 'Sucursal Principal',
+        'address'       => '',
+        'phone'         => '',
+        'email'         => '',
+        'manager_name'  => '',
+        'tax_rate'      => 13.0,
         'currency_code' => 'USD',
         'currency_symbol' => '$',
-        'is_main' => true,
-        'active' => 1,
+        'is_main'       => true,
+        'active'        => 1,
         'record_status' => 1,
     ];
 }
@@ -153,9 +153,9 @@ function sb_get_accessible_branches(mysqli $connect): array
     $canSwitch = $userId > 0 ? sb_user_can_switch_branches($connect, $userId) : false;
 
     if ($canSwitch) {
-        $sql = 'SELECT b.*, COALESCE(gca.current_balance, 0) AS general_cash_balance, (SELECT COUNT(*) FROM cash_sessions cs WHERE cs.branch_id = b.branch_id AND cs.status = "open") AS open_sessions_count FROM branches b LEFT JOIN general_cash_accounts gca ON gca.branch_id = b.branch_id WHERE b.record_status = 1 AND b.active = 1 ORDER BY b.is_main DESC, b.branch_id ASC';
-        $res = $connect->query($sql);
-        $list = [];
+        $sql    = 'SELECT b.*, COALESCE(gca.current_balance, 0) AS general_cash_balance, (SELECT COUNT(*) FROM cash_sessions cs WHERE cs.branch_id = b.branch_id AND cs.status = "open") AS open_sessions_count FROM branches b LEFT JOIN general_cash_accounts gca ON gca.branch_id = b.branch_id WHERE b.record_status = 1 AND b.active = 1 ORDER BY b.is_main DESC, b.branch_id ASC';
+        $res    = $connect->query($sql);
+        $list   = [];
         if ($res) {
             while ($row = $res->fetch_assoc()) {
                 $item = sb_format_branch_row($row);
@@ -167,15 +167,15 @@ function sb_get_accessible_branches(mysqli $connect): array
         return $list;
     }
 
-    $branchId = get_active_branch_id($connect);
-    $stmt = $connect->prepare('SELECT b.*, COALESCE(gca.current_balance, 0) AS general_cash_balance, (SELECT COUNT(*) FROM cash_sessions cs WHERE cs.branch_id = b.branch_id AND cs.status = "open") AS open_sessions_count FROM branches b LEFT JOIN general_cash_accounts gca ON gca.branch_id = b.branch_id WHERE b.branch_id = ? AND b.record_status = 1 AND b.active = 1 LIMIT 1');
-    $list = [];
+    $branchId   = get_active_branch_id($connect);
+    $stmt       = $connect->prepare('SELECT b.*, COALESCE(gca.current_balance, 0) AS general_cash_balance, (SELECT COUNT(*) FROM cash_sessions cs WHERE cs.branch_id = b.branch_id AND cs.status = "open") AS open_sessions_count FROM branches b LEFT JOIN general_cash_accounts gca ON gca.branch_id = b.branch_id WHERE b.branch_id = ? AND b.record_status = 1 AND b.active = 1 LIMIT 1');
+    $list       = [];
     if ($stmt) {
         $stmt->bind_param('i', $branchId);
         $stmt->execute();
-        $res = $stmt->get_result();
+        $res        = $stmt->get_result();
         while ($row = $res->fetch_assoc()) {
-            $item = sb_format_branch_row($row);
+            $item   = sb_format_branch_row($row);
             $item['general_cash_balance'] = round((float)$row['general_cash_balance'], 2);
             $item['open_sessions_count'] = (int)$row['open_sessions_count'];
             $list[] = $item;
@@ -187,47 +187,46 @@ function sb_get_accessible_branches(mysqli $connect): array
 
 function sb_ensure_branch_cash_defaults(mysqli $connect, int $branchId, string $branchName, float $initialCapital = 0.0, int $userId = 1): void
 {
-    $accName = 'Caja General — ' . $branchName;
-    $notes = 'Fondo operativo independiente de ' . $branchName;
-
-    $stmtAcc = $connect->prepare('SELECT account_id, current_balance FROM general_cash_accounts WHERE branch_id = ? LIMIT 1');
+    $accName    = 'Caja General — ' . $branchName;
+    $notes      = 'Fondo operativo independiente de ' . $branchName;
+    $stmtAcc    = $connect->prepare('SELECT account_id, current_balance FROM general_cash_accounts WHERE branch_id = ? LIMIT 1');
     $stmtAcc->bind_param('i', $branchId);
     $stmtAcc->execute();
     $existingAcc = $stmtAcc->get_result()->fetch_assoc();
     $stmtAcc->close();
 
     if (!$existingAcc) {
-        $initCap = round(max(0, $initialCapital), 2);
-        $insAcc = $connect->prepare('INSERT INTO general_cash_accounts (branch_id, account_name, current_balance, initial_capital, min_balance_alert, status, notes, updated_by) VALUES (?, ?, ?, ?, 100.00, 1, ?, ?)');
+        $initCap    = round(max(0, $initialCapital), 2);
+        $insAcc     = $connect->prepare('INSERT INTO general_cash_accounts (branch_id, account_name, current_balance, initial_capital, min_balance_alert, status, notes, updated_by) VALUES (?, ?, ?, ?, 100.00, 1, ?, ?)');
         $insAcc->bind_param('isddsi', $branchId, $accName, $initCap, $initCap, $notes, $userId);
         $insAcc->execute();
-        $accountId = (int)$connect->insert_id;
+        $accountId  = (int)$connect->insert_id;
         $insAcc->close();
 
         if ($initCap > 0) {
-            $movType = 'initial_capital';
-            $dir = 'in';
-            $zero = 0.00;
-            $ref = sprintf('SUC-%03d', $branchId);
-            $desc = 'Capital inicial al crear sucursal ' . $branchName;
-            $movStmt = $connect->prepare('INSERT INTO general_cash_movements (branch_id, account_id, user_id, movement_type, direction, amount, balance_before, balance_after, reference, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $movType    = 'initial_capital';
+            $dir        = 'in';
+            $zero       = 0.00;
+            $ref        = sprintf('SUC-%03d', $branchId);
+            $desc       = 'Capital inicial al crear sucursal ' . $branchName;
+            $movStmt    = $connect->prepare('INSERT INTO general_cash_movements (branch_id, account_id, user_id, movement_type, direction, amount, balance_before, balance_after, reference, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $movStmt->bind_param('iiissdddss', $branchId, $accountId, $userId, $movType, $dir, $initCap, $zero, $initCap, $ref, $desc);
             $movStmt->execute();
             $movStmt->close();
         }
     }
 
-    $regStmt = $connect->prepare('SELECT COUNT(*) AS cnt FROM cash_registers WHERE branch_id = ? AND record_status = 1');
+    $regStmt    = $connect->prepare('SELECT COUNT(*) AS cnt FROM cash_registers WHERE branch_id = ? AND record_status = 1');
     $regStmt->bind_param('i', $branchId);
     $regStmt->execute();
-    $regCnt = (int)($regStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+    $regCnt     = (int)($regStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
     $regStmt->close();
 
     if ($regCnt === 0) {
-        $regCode = 'CAJA-01';
-        $regName = 'Caja Principal';
-        $location = 'Mostrador';
-        $insReg = $connect->prepare('INSERT INTO cash_registers (branch_id, register_code, register_name, location, active, record_status) VALUES (?, ?, ?, ?, 1, 1)');
+        $regCode    = 'CAJA-01';
+        $regName    = 'Caja Principal';
+        $location   = 'Mostrador';
+        $insReg     = $connect->prepare('INSERT INTO cash_registers (branch_id, register_code, register_name, location, active, record_status) VALUES (?, ?, ?, ?, 1, 1)');
         $insReg->bind_param('isss', $branchId, $regCode, $regName, $location);
         $insReg->execute();
         $insReg->close();

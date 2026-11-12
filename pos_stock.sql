@@ -1,5 +1,5 @@
--- Stock Bartolo — Esquema Completo Multi-Sucursal (17 Tablas)
--- Versión: 2.1.0 (SPA Vue 3 + Pinia + Multi-Tenant + Caja General + Caja)
+-- Stock Bartolo — Esquema Completo Multi-Sucursal y Seguridad (20 Tablas)
+-- Versión: 2.2.0 (SPA Vue 3 + Pinia + Multi-Tenant + Caja General + Caja + Seguridad y Auditoría)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
@@ -334,19 +334,106 @@ CREATE TABLE IF NOT EXISTS `loan_payments` (
   KEY `idx_loan_payments_loan` (`loan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- --------------------------------------------------------
+-- 5. Seguridad: Usuarios, Roles, Permisos y Auditoría
+-- --------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `roles` (
+  `role_id` int(11) NOT NULL AUTO_INCREMENT,
+  `role_name` varchar(100) NOT NULL,
+  `role_slug` varchar(50) NOT NULL,
+  `description` varchar(255) DEFAULT '',
+  `is_system` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`role_id`),
+  UNIQUE KEY `uniq_role_slug` (`role_slug`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO `roles` (`role_id`, `role_name`, `role_slug`, `description`, `is_system`) VALUES
+(1, 'Superadministrador', 'superadmin', 'Control absoluto del sistema, todas las sucursales, finanzas y seguridad.', 1),
+(2, 'Administrador', 'admin', 'Gestión operativa y administrativa completa de inventario, ventas, caja, préstamos y usuarios.', 1),
+(3, 'Supervisor', 'supervisor', 'Supervisión de operaciones, reportes, arqueos y consulta de auditoría.', 0),
+(4, 'Cajero', 'cashier', 'Operación de ventas en mostrador, turnos de caja y cobro de cuotas de préstamos.', 0),
+(5, 'Vendedor', 'seller', 'Consulta de productos y emisión de órdenes de venta.', 0);
+
+CREATE TABLE IF NOT EXISTS `role_permissions` (
+  `permission_id` int(11) NOT NULL AUTO_INCREMENT,
+  `role_id` int(11) NOT NULL,
+  `module` varchar(50) NOT NULL,
+  `can_access` tinyint(1) NOT NULL DEFAULT 0,
+  `can_create` tinyint(1) NOT NULL DEFAULT 0,
+  `can_update` tinyint(1) NOT NULL DEFAULT 0,
+  `can_delete` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`permission_id`),
+  UNIQUE KEY `uniq_role_module` (`role_id`, `module`),
+  KEY `idx_role_perm_role` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO `role_permissions` (`role_id`, `module`, `can_access`, `can_create`, `can_update`, `can_delete`) VALUES
+(1, 'dashboard', 1, 1, 1, 1), (1, 'brands', 1, 1, 1, 1), (1, 'categories', 1, 1, 1, 1), (1, 'products', 1, 1, 1, 1),
+(1, 'orders', 1, 1, 1, 1), (1, 'cash_register', 1, 1, 1, 1), (1, 'loans', 1, 1, 1, 1), (1, 'reports', 1, 1, 1, 1),
+(1, 'general_cash', 1, 1, 1, 1), (1, 'branches', 1, 1, 1, 1), (1, 'system_config', 1, 1, 1, 1),
+(1, 'users', 1, 1, 1, 1), (1, 'roles', 1, 1, 1, 1), (1, 'audit_logs', 1, 1, 1, 1),
+(2, 'dashboard', 1, 0, 0, 0), (2, 'brands', 1, 1, 1, 1), (2, 'categories', 1, 1, 1, 1), (2, 'products', 1, 1, 1, 1),
+(2, 'orders', 1, 1, 1, 1), (2, 'cash_register', 1, 1, 1, 1), (2, 'loans', 1, 1, 1, 1), (2, 'reports', 1, 0, 0, 0),
+(2, 'general_cash', 1, 1, 1, 1), (2, 'branches', 1, 1, 1, 0), (2, 'system_config', 1, 0, 1, 0),
+(2, 'users', 1, 1, 1, 1), (2, 'roles', 1, 1, 1, 0), (2, 'audit_logs', 1, 0, 0, 0),
+(3, 'dashboard', 1, 0, 0, 0), (3, 'brands', 1, 1, 1, 0), (3, 'categories', 1, 1, 1, 0), (3, 'products', 1, 1, 1, 0),
+(3, 'orders', 1, 1, 1, 1), (3, 'cash_register', 1, 1, 1, 0), (3, 'loans', 1, 1, 1, 0), (3, 'reports', 1, 0, 0, 0),
+(3, 'general_cash', 1, 0, 0, 0), (3, 'branches', 1, 0, 0, 0), (3, 'system_config', 0, 0, 0, 0),
+(3, 'users', 1, 0, 0, 0), (3, 'roles', 1, 0, 0, 0), (3, 'audit_logs', 1, 0, 0, 0),
+(4, 'dashboard', 1, 0, 0, 0), (4, 'brands', 1, 0, 0, 0), (4, 'categories', 1, 0, 0, 0), (4, 'products', 1, 0, 0, 0),
+(4, 'orders', 1, 1, 1, 0), (4, 'cash_register', 1, 1, 1, 0), (4, 'loans', 1, 0, 1, 0), (4, 'reports', 0, 0, 0, 0),
+(4, 'general_cash', 0, 0, 0, 0), (4, 'branches', 0, 0, 0, 0), (4, 'system_config', 0, 0, 0, 0),
+(4, 'users', 0, 0, 0, 0), (4, 'roles', 0, 0, 0, 0), (4, 'audit_logs', 0, 0, 0, 0),
+(5, 'dashboard', 1, 0, 0, 0), (5, 'brands', 1, 0, 0, 0), (5, 'categories', 1, 0, 0, 0), (5, 'products', 1, 0, 0, 0),
+(5, 'orders', 1, 1, 0, 0), (5, 'cash_register', 0, 0, 0, 0), (5, 'loans', 1, 0, 0, 0), (5, 'reports', 0, 0, 0, 0),
+(5, 'general_cash', 0, 0, 0, 0), (5, 'branches', 0, 0, 0, 0), (5, 'system_config', 0, 0, 0, 0),
+(5, 'users', 0, 0, 0, 0), (5, 'roles', 0, 0, 0, 0), (5, 'audit_logs', 0, 0, 0, 0);
+
+CREATE TABLE IF NOT EXISTS `audit_logs` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `username` varchar(100) NOT NULL DEFAULT 'sistema',
+  `branch_id` int(11) DEFAULT NULL,
+  `module` varchar(50) NOT NULL,
+  `action` varchar(50) NOT NULL,
+  `description` varchar(255) NOT NULL,
+  `ip_address` varchar(45) NOT NULL DEFAULT '',
+  `user_agent` varchar(255) DEFAULT '',
+  `details` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `idx_audit_created` (`created_at`),
+  KEY `idx_audit_user` (`user_id`, `created_at`),
+  KEY `idx_audit_module_action` (`module`, `action`),
+  KEY `idx_audit_branch` (`branch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `users` (
   `user_id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(255) NOT NULL,
+  `full_name` varchar(150) DEFAULT '',
   `password` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
+  `phone` varchar(60) DEFAULT '',
+  `role_id` int(11) NOT NULL DEFAULT 1,
   `branch_id` int(11) NOT NULL DEFAULT 1,
   `role` varchar(30) NOT NULL DEFAULT 'superadmin',
   `active` tinyint(1) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
+  `last_login` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`),
+  KEY `idx_users_role_id` (`role_id`),
+  KEY `idx_users_branch` (`branch_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
 
-INSERT IGNORE INTO `users` (`user_id`, `username`, `password`, `email`, `branch_id`, `role`, `active`) VALUES
-(1, 'admin', '21232f297a57a5a743894a0e4a801fc3', '', 1, 'superadmin', 1);
+INSERT IGNORE INTO `users` (`user_id`, `username`, `full_name`, `password`, `email`, `phone`, `role_id`, `branch_id`, `role`, `active`) VALUES
+(1, 'admin', 'Administrador Principal', '21232f297a57a5a743894a0e4a801fc3', '', '', 1, 1, 'superadmin', 1);
 
 CREATE TABLE IF NOT EXISTS `login_attempts` (
   `attempt_id` int(11) NOT NULL AUTO_INCREMENT,

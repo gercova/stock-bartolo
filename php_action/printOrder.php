@@ -31,20 +31,20 @@ $itemRes = $itemStmt->get_result();
 $items = [];
 while ($row = $itemRes->fetch_assoc()) {
     $items[] = [
-        'product_id' => (int)$row['product_id'],
-        'product_name' => $row['product_name'],
-        'rate' => (float)$row['rate'],
-        'quantity' => (int)$row['quantity'],
-        'total' => (float)$row['total'],
+        'product_id'    => (int)$row['product_id'],
+        'product_name'  => $row['product_name'],
+        'rate'          => (float)$row['rate'],
+        'quantity'      => (int)$row['quantity'],
+        'total'         => (float)$row['total'],
     ];
 }
 $itemStmt->close();
 $connect->close();
 
 json_response([
-    'success' => true,
-    'branch' => $activeBranch,
-    'order' => [
+    'success'   => true,
+    'branch'    => $activeBranch,
+    'order'     => [
         'order_id' => (int)$order['order_id'],
         'branch_id' => (int)$order['branch_id'],
         'order_date' => $order['order_date'],

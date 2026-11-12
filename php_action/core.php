@@ -27,6 +27,7 @@ enforce_session_timeout(7200);
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/ensure_schema.php';
 require_once __DIR__ . '/tenant.php';
+require_once __DIR__ . '/security_roles.php';
 
 ensure_app_schema($connect);
 
@@ -34,10 +35,25 @@ if (!defined('SKIP_AUTH_CHECK')) {
     if (empty($_SESSION['userId'])) {
         send_http_error(401, 'Tu sesión ha expirado o no has iniciado sesión.');
     }
+    $authUid    = (int)$_SESSION['userId'];
+    $uCheck     = $connect->prepare('SELECT active, role_id, role, branch_id FROM users WHERE user_id = ? LIMIT 1');
+    if ($uCheck) {
+        $uCheck->bind_param('i', $authUid);
+        $uCheck->execute();
+        $uRow = $uCheck->get_result()->fetch_assoc();
+        $uCheck->close();
+        if (!$uRow || (int)($uRow['active'] ?? 1) !== 1) {
+            $_SESSION = [];
+            send_http_error(401, 'Tu cuenta de usuario ha sido desactivada o no existe.');
+        }
+        if (!empty($uRow['role'])) {
+            $_SESSION['user_role'] = (string)$uRow['role'];
+        }
+    }
 }
 
-$csrfToken = ensure_csrf_token();
-$requestMethod = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+$csrfToken      = ensure_csrf_token();
+$requestMethod  = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 if (in_array($requestMethod, ['GET', 'HEAD'], true)) {
     issue_csrf_cookie($csrfToken);
 } elseif (!defined('SKIP_CSRF_CHECK')) {
@@ -103,18 +119,18 @@ function normalize_image_url(?string $path): string
         return 'assests/images/photo_default.png';
     }
     if (str_starts_with($clean, '../')) {
-        $clean = substr($clean, 3);
+        $clean  = substr($clean, 3);
     }
     if (str_starts_with($clean, './')) {
-        $clean = substr($clean, 2);
+        $clean  = substr($clean, 2);
     }
-    $clean = ltrim($clean, '/');
+    $clean      = ltrim($clean, '/');
     if (str_contains($clean, '..')) {
         return 'assests/images/photo_default.png';
     }
 
     $imagesRoot = realpath(dirname(__DIR__) . '/assests/images');
-    $diskPath = realpath(dirname(__DIR__) . '/' . $clean);
+    $diskPath   = realpath(dirname(__DIR__) . '/' . $clean);
     if ($imagesRoot === false || $diskPath === false || !is_file($diskPath) || !str_starts_with($diskPath, $imagesRoot)) {
         return 'assests/images/photo_default.png';
     }

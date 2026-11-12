@@ -3,15 +3,15 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
-$branchId = get_active_branch_id($connect);
-$activeBranch = get_active_branch($connect);
-$userId = (int)$_SESSION['userId'];
-$data = get_request_data();
+$branchId       = get_active_branch_id($connect);
+$activeBranch   = get_active_branch($connect);
+$userId         = (int)$_SESSION['userId'];
+$data           = get_request_data();
 
-$registerId = (int)($data['registerId'] ?? 0);
-$openingAmount = round((float)($data['openingAmount'] ?? 0), 2);
-$fundFromGeneralCash = !empty($data['fundFromGeneralCash']);
-$openingNotes = sanitize_clean_text($data['openingNotes'] ?? '', 'notas de apertura', 255, false);
+$registerId             = (int)($data['registerId'] ?? 0);
+$openingAmount          = round((float)($data['openingAmount'] ?? 0), 2);
+$fundFromGeneralCash    = !empty($data['fundFromGeneralCash']);
+$openingNotes           = sanitize_clean_text($data['openingNotes'] ?? '', 'notas de apertura', 255, false);
 
 if ($registerId <= 0 || $openingAmount < 0) {
     send_http_error(400, 'Selecciona una caja válida e indica un monto de apertura mayor o igual a $0.00.');

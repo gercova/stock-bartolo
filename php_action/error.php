@@ -6,7 +6,7 @@ require_once __DIR__ . '/security.php';
 configure_secure_php_environment();
 
 $rawCode = $_GET['code'] ?? $_SERVER['REDIRECT_STATUS'] ?? 404;
-$code = (int)$rawCode;
+$code    = (int)$rawCode;
 $catalog = get_http_error_catalog();
 
 if (!isset($catalog[$code])) {

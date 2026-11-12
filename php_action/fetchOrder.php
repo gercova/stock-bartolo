@@ -3,8 +3,8 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
 
-$branchId = get_active_branch_id($connect);
-$sql = "SELECT
+$branchId   = get_active_branch_id($connect);
+$sql        = "SELECT
     o.order_id,
     o.branch_id,
     o.order_date,

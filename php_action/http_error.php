@@ -95,7 +95,7 @@ function prefers_html_response(): bool
     }
 
     $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-    $xhr = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+    $xhr    = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
     if (strtolower($xhr) === 'xmlhttprequest' || str_contains($accept, 'application/json')) {
         return false;
     }
@@ -110,12 +110,12 @@ function prefers_html_response(): bool
 
 function send_http_error(int $code, string $message = '', array $details = [], ?bool $forceHtml = null): void
 {
-    $catalog = get_http_error_catalog();
-    $entry = $catalog[$code] ?? [
-        'title' => 'Error HTTP ' . $code,
-        'short' => 'HTTP Error',
-        'description' => 'Ha ocurrido un error al procesar la solicitud.',
-        'hint' => 'Regresa al inicio e inténtalo nuevamente.',
+    $catalog    = get_http_error_catalog();
+    $entry      = $catalog[$code] ?? [
+        'title'         => 'Error HTTP ' . $code,
+        'short'         => 'HTTP Error',
+        'description'   => 'Ha ocurrido un error al procesar la solicitud.',
+        'hint'          => 'Regresa al inicio e inténtalo nuevamente.',
     ];
 
     $finalMessage = $message !== '' ? $message : $entry['description'];
@@ -128,10 +128,10 @@ function send_http_error(int $code, string $message = '', array $details = [], ?
 
     if ($renderHtml) {
         header('Content-Type: text/html; charset=utf-8');
-        $safeTitle = htmlspecialchars($entry['title'], ENT_QUOTES, 'UTF-8');
-        $safeShort = htmlspecialchars($entry['short'], ENT_QUOTES, 'UTF-8');
-        $safeMsg = htmlspecialchars($finalMessage, ENT_QUOTES, 'UTF-8');
-        $safeHint = htmlspecialchars($entry['hint'], ENT_QUOTES, 'UTF-8');
+        $safeTitle  = htmlspecialchars($entry['title'], ENT_QUOTES, 'UTF-8');
+        $safeShort  = htmlspecialchars($entry['short'], ENT_QUOTES, 'UTF-8');
+        $safeMsg    = htmlspecialchars($finalMessage, ENT_QUOTES, 'UTF-8');
+        $safeHint   = htmlspecialchars($entry['hint'], ENT_QUOTES, 'UTF-8');
 
         echo <<<HTML
 <!DOCTYPE html>
