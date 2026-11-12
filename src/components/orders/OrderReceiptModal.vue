@@ -54,6 +54,14 @@
 
           <button
             type="button"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50 shadow-xs transition"
+            @click="triggerPdf"
+          >
+            <Download class="h-4 w-4" />
+            Descargar / Guardar PDF
+          </button>
+          <button
+            type="button"
             class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-indigo-700 shadow-sm transition"
             @click="triggerPrint"
           >
@@ -507,10 +515,11 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Receipt, FileText, FileSpreadsheet, Printer } from '@lucide/vue'
+import { Receipt, FileText, FileSpreadsheet, Printer, Download } from '@lucide/vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { formatCurrency, formatDate, paymentMethodLabel } from '@/utils/formatters'
 import { useAuthStore } from '@/stores/auth'
+import { printHtmlDocument } from '@/utils/printHelper'
 
 const props = defineProps({
   open: {
@@ -551,72 +560,32 @@ function handleClose() {
   emit('close')
 }
 
+function getPrintElementId() {
+  if (selectedFormat.value === 'a5') return 'print-area-a5'
+  if (selectedFormat.value === 'a4') return 'print-area-a4'
+  return 'print-area-ticket'
+}
+
 function triggerPrint() {
   if (!order.value) return
+  const el = document.getElementById(getPrintElementId())
+  if (!el) return
+  printHtmlDocument({
+    title: `Comprobante_Venta_${order.value.order_id || 'COMP'}`,
+    htmlContent: el.outerHTML,
+    format: selectedFormat.value,
+  })
+}
 
-  let printElementId = 'print-area-ticket'
-  let pageSizeRule = '@page { size: 80mm auto; margin: 3mm; }'
-
-  if (selectedFormat.value === 'a5') {
-    printElementId = 'print-area-a5'
-    pageSizeRule = '@page { size: A5 landscape; margin: 8mm; }'
-  } else if (selectedFormat.value === 'a4') {
-    printElementId = 'print-area-a4'
-    pageSizeRule = '@page { size: A4 portrait; margin: 10mm; }'
-  }
-
-  const printNode = document.getElementById(printElementId)
-  if (!printNode) return
-
-  const printWindow = window.open('', '_blank', 'width=850,height=900')
-  if (!printWindow) {
-    window.print()
-    return
-  }
-
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <title>Comprobante de Venta #${order.value.order_id} - ${formatLabel.value}</title>
-      <script src="https://cdn.tailwindcss.com"><\/script>
-      <style>
-        ${pageSizeRule}
-        body {
-          margin: 0;
-          padding: 8px;
-          background: #ffffff;
-          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-          color: #0f172a;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        @media print {
-          body {
-            padding: 0;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="flex justify-center">
-        ${printNode.outerHTML}
-      </div>
-      <script>
-        window.onload = function() {
-          window.focus();
-          window.print();
-          setTimeout(function() { window.close(); }, 500);
-        };
-      <\/script>
-    </body>
-    </html>
-  `
-
-  printWindow.document.open()
-  printWindow.document.write(htmlContent)
-  printWindow.document.close()
+function triggerPdf() {
+  if (!order.value) return
+  const el = document.getElementById(getPrintElementId())
+  if (!el) return
+  printHtmlDocument({
+    title: `Comprobante_Venta_${order.value.order_id || 'COMP'}`,
+    htmlContent: el.outerHTML,
+    format: selectedFormat.value,
+  })
 }
 </script>
 

@@ -7,8 +7,9 @@ sb_assert_permission($connect, 'operations', 'access');
 
 $branchId = get_active_branch_id($connect);
 $search = trim((string)($_GET['search'] ?? ''));
-$limit = min(200, max(5, (int)($_GET['limit'] ?? 50)));
 $selectedClientId = isset($_GET['client_id']) && $_GET['client_id'] !== '' ? (int)$_GET['client_id'] : 0;
+
+$pagination = sb_get_pagination_params(25, 250);
 
 $where = ['c.record_status = 1'];
 $params = [];
@@ -24,6 +25,17 @@ if ($search !== '') {
 }
 
 $whereSql = implode(' AND ', $where);
+
+// Count total matching clients
+$countSql = "SELECT COUNT(DISTINCT c.client_id) as total FROM clients c WHERE {$whereSql}";
+$cStmt = $connect->prepare($countSql);
+if (!empty($params)) {
+    $cStmt->bind_param($types, ...$params);
+}
+$cStmt->execute();
+$totalRow = $cStmt->get_result()->fetch_assoc();
+$total = (int)($totalRow['total'] ?? 0);
+$cStmt->close();
 
 // Fetch leaderboard ordered by lifetime_points DESC, points_balance DESC
 $sql = "SELECT 
@@ -42,22 +54,27 @@ $sql = "SELECT
         LEFT JOIN branch_operations o ON c.client_id = o.client_id AND o.status = 'completed'
         WHERE {$whereSql}
         GROUP BY c.client_id
-        ORDER BY c.lifetime_points DESC, c.points_balance DESC, c.client_id ASC
-        LIMIT ?";
+        ORDER BY c.lifetime_points DESC, c.points_balance DESC, c.client_id ASC";
 
-$pageParams = $params;
-$pageParams[] = $limit;
-$pageTypes = $types . 'i';
+$dataParams = $params;
+$dataTypes = $types;
+
+if ($pagination['enabled']) {
+    $sql .= " LIMIT ? OFFSET ?";
+    $dataParams[] = $pagination['limit'];
+    $dataParams[] = $pagination['offset'];
+    $dataTypes .= 'ii';
+}
 
 $stmt = $connect->prepare($sql);
-if ($pageTypes !== '') {
-    $stmt->bind_param($pageTypes, ...$pageParams);
+if (!empty($dataParams)) {
+    $stmt->bind_param($dataTypes, ...$dataParams);
 }
 $stmt->execute();
 $res = $stmt->get_result();
 
 $leaderboard = [];
-$rank = 1;
+$rank = $pagination['enabled'] ? ($pagination['offset'] + 1) : 1;
 while ($row = $res->fetch_assoc()) {
     $leaderboard[] = [
         'rank' => $rank++,
@@ -121,9 +138,11 @@ if ($selectedClientId > 0) {
 
 $connect->close();
 
+$meta = sb_build_pagination_meta($total, $pagination);
+
 json_response([
     'success' => true,
-    'leaderboard' => $leaderboard,
+    'data' => $leaderboard,
+    'pagination' => $meta,
     'client_history' => $clientHistory,
 ]);
-

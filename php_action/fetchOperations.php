@@ -5,27 +5,28 @@ require_method(['GET']);
 
 sb_assert_permission($connect, 'operations', 'access');
 
-$branchId = get_active_branch_id($connect);
-$startDate = trim((string)($_GET['startDate'] ?? ''));
-$endDate = trim((string)($_GET['endDate'] ?? ''));
-$opType = trim((string)($_GET['operation_type'] ?? 'all'));
-$clientId = isset($_GET['client_id']) && $_GET['client_id'] !== '' ? (int)$_GET['client_id'] : null;
-$search = trim((string)($_GET['search'] ?? ''));
-$limit = min(200, max(10, (int)($_GET['limit'] ?? 50)));
+$branchId   = get_active_branch_id($connect);
+$startDate  = trim((string)($_GET['startDate'] ?? ''));
+$endDate    = trim((string)($_GET['endDate'] ?? ''));
+$opType     = trim((string)($_GET['operation_type'] ?? 'all'));
+$clientId   = isset($_GET['client_id']) && $_GET['client_id'] !== '' ? (int)$_GET['client_id'] : null;
+$search     = trim((string)($_GET['search'] ?? ''));
+
+$pagination = sb_get_pagination_params(25, 250);
 
 // Ensure branch central cash account exists
 $branchStmt = $connect->prepare('SELECT branch_id, branch_name FROM branches WHERE branch_id = ? LIMIT 1');
 $branchStmt->bind_param('i', $branchId);
 $branchStmt->execute();
-$branchRow = $branchStmt->get_result()->fetch_assoc();
+$branchRow  = $branchStmt->get_result()->fetch_assoc();
 $branchStmt->close();
 sb_ensure_branch_cash_defaults($connect, $branchId, (string)($branchRow['branch_name'] ?? 'Sucursal'), 0.0, (int)$_SESSION['userId']);
 
 // Fetch central cash drawer balance
-$cashAccStmt = $connect->prepare('SELECT account_id, current_balance, min_balance_alert FROM general_cash_accounts WHERE branch_id = ? LIMIT 1');
+$cashAccStmt    = $connect->prepare('SELECT account_id, current_balance, min_balance_alert FROM general_cash_accounts WHERE branch_id = ? LIMIT 1');
 $cashAccStmt->bind_param('i', $branchId);
 $cashAccStmt->execute();
-$cashAcc = $cashAccStmt->get_result()->fetch_assoc();
+$cashAcc        = $cashAccStmt->get_result()->fetch_assoc();
 $cashAccStmt->close();
 
 $centralCashBalance = (float)($cashAcc['current_balance'] ?? 0.0);
@@ -33,52 +34,68 @@ $centralCashBalance = (float)($cashAcc['current_balance'] ?? 0.0);
 // Fetch system settings for loyalty and operations
 $sysConfig = sb_get_system_config($connect);
 
-$where = ['o.branch_id = ?'];
+$where  = ['o.branch_id = ?'];
 $params = [$branchId];
-$types = 'i';
+$types  = 'i';
 
 if ($startDate !== '') {
-    $where[] = 'o.created_at >= ?';
+    $where[]  = 'o.created_at >= ?';
     $params[] = $startDate . ' 00:00:00';
-    $types .= 's';
+    $types    .= 's';
 }
 
 if ($endDate !== '') {
-    $where[] = 'o.created_at <= ?';
+    $where[]  = 'o.created_at <= ?';
     $params[] = $endDate . ' 23:59:59';
-    $types .= 's';
+    $types      .= 's';
 }
 
 if ($opType !== '' && $opType !== 'all') {
-    $where[] = 'o.operation_type = ?';
-    $params[] = $opType;
-    $types .= 's';
+    $where[]    = 'o.operation_type = ?';
+    $params[]   = $opType;
+    $types      .= 's';
 }
 
 if ($clientId !== null && $clientId > 0) {
-    $where[] = 'o.client_id = ?';
-    $params[] = $clientId;
-    $types .= 'i';
+    $where[]    = 'o.client_id = ?';
+    $params[]   = $clientId;
+    $types      .= 'i';
 }
 
 if ($search !== '') {
-    $where[] = '(o.operation_code LIKE ? OR c.name LIKE ? OR c.document_number LIKE ?)';
-    $like = '%' . $search . '%';
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $types .= 'sss';
+    $where[]    = '(o.operation_code LIKE ? OR c.name LIKE ? OR c.document_number LIKE ?)';
+    $like       = '%' . $search . '%';
+    $params[]   = $like;
+    $params[]   = $like;
+    $params[]   = $like;
+    $types      .= 'sss';
 }
 
 $whereSql = implode(' AND ', $where);
 
+// Count total matching operations
+$countSql = "SELECT COUNT(*) as total
+             FROM branch_operations o
+             INNER JOIN clients c ON o.client_id = c.client_id
+             WHERE {$whereSql}";
+$cStmt = $connect->prepare($countSql);
+$cStmt->bind_param($types, ...$params);
+$cStmt->execute();
+$totalRow = $cStmt->get_result()->fetch_assoc();
+$total = (int)($totalRow['total'] ?? 0);
+$cStmt->close();
+
 $sql = "SELECT 
             o.operation_id,
             o.branch_id,
+            o.session_id,
             o.operation_code,
             o.client_id,
             o.user_id,
             o.operation_type,
+            o.source_bank_entity,
+            o.destination_bank_entity,
+            o.destination_account,
             o.amount,
             o.commission_amount,
             o.commission_included,
@@ -100,15 +117,20 @@ $sql = "SELECT
         INNER JOIN clients c ON o.client_id = c.client_id
         LEFT JOIN users u ON o.user_id = u.user_id
         WHERE {$whereSql}
-        ORDER BY o.operation_id DESC
-        LIMIT ?";
+        ORDER BY o.operation_id DESC";
 
-$pageParams = $params;
-$pageParams[] = $limit;
-$pageTypes = $types . 'i';
+$dataParams = $params;
+$dataTypes = $types;
+
+if ($pagination['enabled']) {
+    $sql .= " LIMIT ? OFFSET ?";
+    $dataParams[] = $pagination['limit'];
+    $dataParams[] = $pagination['offset'];
+    $dataTypes .= 'ii';
+}
 
 $stmt = $connect->prepare($sql);
-$stmt->bind_param($pageTypes, ...$pageParams);
+$stmt->bind_param($dataTypes, ...$dataParams);
 $stmt->execute();
 $res = $stmt->get_result();
 
@@ -117,6 +139,7 @@ while ($row = $res->fetch_assoc()) {
     $operations[] = [
         'operation_id' => (int)$row['operation_id'],
         'branch_id' => (int)$row['branch_id'],
+        'session_id' => $row['session_id'] !== null ? (int)$row['session_id'] : null,
         'operation_code' => (string)$row['operation_code'],
         'client_id' => (int)$row['client_id'],
         'client_name' => (string)$row['client_name'],
@@ -126,6 +149,9 @@ while ($row = $res->fetch_assoc()) {
         'client_current_points' => (int)$row['client_current_points'],
         'cashier_name' => (string)$row['cashier_name'],
         'operation_type' => (string)$row['operation_type'],
+        'source_bank_entity' => (string)($row['source_bank_entity'] ?: 'BCP'),
+        'destination_bank_entity' => (string)($row['destination_bank_entity'] ?: 'BCP'),
+        'destination_account' => (string)($row['destination_account'] ?? ''),
         'amount' => (float)$row['amount'],
         'commission_amount' => (float)$row['commission_amount'],
         'commission_included' => ((int)$row['commission_included']) === 1,
@@ -165,9 +191,12 @@ $stats = [
 
 $connect->close();
 
+$meta = sb_build_pagination_meta($total, $pagination);
+
 json_response([
     'success' => true,
     'data' => $operations,
+    'pagination' => $meta,
     'stats' => $stats,
     'central_cash_balance' => $centralCashBalance,
     'settings' => [
@@ -177,4 +206,3 @@ json_response([
         'commission_rate_per_100' => (float)($sysConfig['commission_rate_per_100'] ?? 1.00),
     ],
 ]);
-

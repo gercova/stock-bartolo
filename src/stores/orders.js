@@ -4,17 +4,36 @@ import apiClient from '@/api/client'
 
 export const useOrdersStore = defineStore('orders', () => {
   const items             = ref([])
+  const pagination        = ref({
+    total: 0,
+    page: 1,
+    per_page: 25,
+    total_pages: 1,
+    has_more: false,
+    from: 0,
+    to: 0,
+    chunk_size: 25,
+    current_chunk: 1,
+    total_chunks: 1,
+  })
   const availableProducts = ref([])
   const currentOrder      = ref(null)
   const currentItems      = ref([])
-  const loading         = ref(false)
+  const loading           = ref(false)
 
-  async function fetchOrders() {
+  async function fetchOrders(params = {}, append = false) {
     loading.value = true
     try {
-      const { data } = await apiClient.get('/fetchOrder.php')
-      items.value = data?.data || []
-      return items.value
+      const { data } = await apiClient.get('/fetchOrder.php', { params })
+      if (append) {
+        items.value = [...items.value, ...(data?.data || [])]
+      } else {
+        items.value = data?.data || []
+      }
+      if (data?.pagination) {
+        pagination.value = data.pagination
+      }
+      return data
     } finally {
       loading.value = false
     }
@@ -54,13 +73,11 @@ export const useOrdersStore = defineStore('orders', () => {
 
   async function addPayment(payload) {
     const { data } = await apiClient.post('/editPayment.php', payload)
-    await fetchOrders()
     return data
   }
 
   async function deleteOrder(orderId) {
     const { data } = await apiClient.post('/removeOrder.php', { orderId })
-    await fetchOrders()
     return data
   }
 
@@ -73,6 +90,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
   return {
     items,
+    pagination,
     availableProducts,
     currentOrder,
     currentItems,

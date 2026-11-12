@@ -92,6 +92,18 @@
                 <span class="text-slate-600">Doc:</span>
                 <span>{{ receiptData.client?.document_type }} {{ receiptData.client?.document_number }}</span>
               </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Fondo / Origen:</span>
+                <span class="font-bold text-indigo-700">{{ receiptData.source_bank_entity || 'BCP' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Entidad Destino:</span>
+                <span class="font-bold text-slate-900">{{ receiptData.destination_bank_entity || 'BCP' }}</span>
+              </div>
+              <div v-if="receiptData.destination_account" class="flex justify-between">
+                <span class="text-slate-600">N° Cuenta/Cel:</span>
+                <span class="font-mono font-bold">{{ receiptData.destination_account }}</span>
+              </div>
             </div>
 
             <div class="border-t border-b border-dashed border-slate-400 py-2 space-y-1 text-[11px]">
@@ -191,6 +203,18 @@
                 <span class="text-slate-600">Doc:</span>
                 <span>{{ receiptData.client?.document_type }} {{ receiptData.client?.document_number }}</span>
               </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Fondo / Origen:</span>
+                <span class="font-bold text-indigo-700">{{ receiptData.source_bank_entity || 'BCP' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Entidad Destino:</span>
+                <span class="font-bold text-slate-900">{{ receiptData.destination_bank_entity || 'BCP' }}</span>
+              </div>
+              <div v-if="receiptData.destination_account" class="flex justify-between">
+                <span class="text-slate-600">N° Cuenta/Cel:</span>
+                <span class="font-mono font-bold">{{ receiptData.destination_account }}</span>
+              </div>
             </div>
 
             <div class="border-t border-b border-dashed border-slate-400 py-2 space-y-1 text-[11px]">
@@ -224,7 +248,7 @@
       </div>
 
       <!-- Modal Footer -->
-      <div class="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5 bg-slate-50">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5 bg-slate-50">
         <button
           type="button"
           class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
@@ -232,14 +256,24 @@
         >
           Cerrar
         </button>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-xs transition"
-          @click="printTicket"
-        >
-          <Printer class="h-4 w-4" />
-          Imprimir Ticket
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50 shadow-xs transition"
+            @click="downloadOrPrintPdf"
+          >
+            <Download class="h-4 w-4" />
+            Descargar / Guardar PDF
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-xs transition"
+            @click="printTicket"
+          >
+            <Printer class="h-4 w-4" />
+            Imprimir Ticket
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -247,7 +281,8 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { Printer, X } from '@lucide/vue'
+import { Printer, X, Download } from '@lucide/vue'
+import { printHtmlDocument } from '@/utils/printHelper'
 
 const props = defineProps({
   modelValue: {
@@ -285,7 +320,29 @@ function resolveLogoUrl(path) {
 }
 
 function printTicket() {
-  window.print()
+  const el = document.getElementById('operation-thermal-ticket')
+  if (!el) {
+    window.print()
+    return
+  }
+  printHtmlDocument({
+    title: `Ticket_${props.receiptData?.operation_code || 'Operacion'}`,
+    htmlContent: el.outerHTML,
+    format: 'ticket',
+  })
+}
+
+function downloadOrPrintPdf() {
+  const el = document.getElementById('operation-thermal-ticket')
+  if (!el) {
+    window.print()
+    return
+  }
+  printHtmlDocument({
+    title: `Comprobante_${props.receiptData?.operation_code || 'Operacion'}`,
+    htmlContent: el.outerHTML,
+    format: 'ticket',
+  })
 }
 </script>
 

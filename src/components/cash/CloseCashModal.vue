@@ -280,7 +280,7 @@ async function submitForm() {
       closingNotes: form.closingNotes,
     })
     ui.success(res?.messages || 'Cierre de caja completado.')
-    emit('closed')
+    emit('closed', props.session?.session_id)
     emit('close')
   } catch (err) {
     ui.error(extractErrorMessage(err))

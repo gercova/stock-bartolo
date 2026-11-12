@@ -8,6 +8,8 @@ $data = get_request_data();
 
 $registerName = sanitize_clean_text($data['registerName'] ?? '', 'nombre de caja', 120, true);
 $rawCode = sanitize_clean_text($data['registerCode'] ?? '', 'código de caja', 32, false);
+$bankEntity = sanitize_clean_text($data['bankEntity'] ?? ($data['bank_entity'] ?? 'BCP'), 'entidad bancaria', 60, false);
+if ($bankEntity === '') $bankEntity = 'BCP';
 $location = sanitize_clean_text($data['location'] ?? '', 'ubicación', 150, false);
 $active = (int)($data['active'] ?? 1);
 
@@ -35,8 +37,8 @@ if ($dup) {
     send_http_error(400, "Ya existe una caja con el código {$registerCode} en esta sucursal.");
 }
 
-$stmt = $connect->prepare('INSERT INTO cash_registers (branch_id, register_code, register_name, location, active, record_status) VALUES (?, ?, ?, ?, ?, 1)');
-$stmt->bind_param('isssi', $branchId, $registerCode, $registerName, $location, $active);
+$stmt = $connect->prepare('INSERT INTO cash_registers (branch_id, register_code, register_name, bank_entity, location, active, record_status) VALUES (?, ?, ?, ?, ?, ?, 1)');
+$stmt->bind_param('issssi', $branchId, $registerCode, $registerName, $bankEntity, $location, $active);
 
 if (!$stmt->execute()) {
     $stmt->close();

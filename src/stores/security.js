@@ -4,6 +4,18 @@ import apiClient from '@/api/client'
 
 export const useSecurityStore = defineStore('security', () => {
   const users     = ref([])
+  const userPagination = ref({
+    total: 0,
+    page: 1,
+    per_page: 25,
+    total_pages: 1,
+    has_more: false,
+    from: 0,
+    to: 0,
+    chunk_size: 25,
+    current_chunk: 1,
+    total_chunks: 1,
+  })
   const userStats = ref({
     total: 0,
     active: 0,
@@ -15,6 +27,18 @@ export const useSecurityStore = defineStore('security', () => {
   const availableModules  = ref([])
 
   const auditLogs   = ref([])
+  const auditPagination = ref({
+    total: 0,
+    page: 1,
+    per_page: 25,
+    total_pages: 1,
+    has_more: false,
+    from: 0,
+    to: 0,
+    chunk_size: 25,
+    current_chunk: 1,
+    total_chunks: 1,
+  })
   const auditTotal  = ref(0)
   const auditStats  = ref({
     total_all: 0,
@@ -29,17 +53,26 @@ export const useSecurityStore = defineStore('security', () => {
   const loadingAudit = ref(false)
   const saving       = ref(false)
 
-  async function fetchUsers(filters = {}) {
+  async function fetchUsers(filters = {}, append = false) {
     loadingUsers.value = true
     try {
       const params = {}
+      if (filters.page) params.page = filters.page
+      if (filters.per_page) params.per_page = filters.per_page
       if (filters.search) params.search = filters.search
       if (filters.role_id) params.role_id = filters.role_id
       if (filters.branch_id) params.branch_id = filters.branch_id
       if (filters.active !== undefined && filters.active !== '') params.active = filters.active
 
       const { data } = await apiClient.get('/fetchUsers.php', { params })
-      users.value = data?.data || []
+      if (append) {
+        users.value = [...users.value, ...(data?.data || [])]
+      } else {
+        users.value = data?.data || []
+      }
+      if (data?.pagination) {
+        userPagination.value = data.pagination
+      }
       if (data?.stats) {
         userStats.value = data.stats
       }
@@ -127,10 +160,12 @@ export const useSecurityStore = defineStore('security', () => {
     }
   }
 
-  async function fetchAuditLogs(filters = {}) {
+  async function fetchAuditLogs(filters = {}, append = false) {
     loadingAudit.value = true
     try {
       const params = {}
+      if (filters.page) params.page = filters.page
+      if (filters.per_page) params.per_page = filters.per_page
       if (filters.startDate) params.startDate = filters.startDate
       if (filters.endDate) params.endDate = filters.endDate
       if (filters.module && filters.module !== 'all') params.module = filters.module
@@ -138,12 +173,17 @@ export const useSecurityStore = defineStore('security', () => {
       if (filters.userId) params.userId = filters.userId
       if (filters.branchId) params.branchId = filters.branchId
       if (filters.search) params.search = filters.search
-      if (filters.limit) params.limit = filters.limit
-      if (filters.offset) params.offset = filters.offset
 
       const { data } = await apiClient.get('/fetchAuditLogs.php', { params })
-      auditLogs.value = data?.data || []
+      if (append) {
+        auditLogs.value = [...auditLogs.value, ...(data?.data || [])]
+      } else {
+        auditLogs.value = data?.data || []
+      }
       auditTotal.value = data?.total || 0
+      if (data?.pagination) {
+        auditPagination.value = data.pagination
+      }
       if (data?.stats) {
         auditStats.value = data.stats
       }
@@ -155,10 +195,12 @@ export const useSecurityStore = defineStore('security', () => {
 
   return {
     users,
+    userPagination,
     userStats,
     roles,
     availableModules,
     auditLogs,
+    auditPagination,
     auditTotal,
     auditStats,
     loadingUsers,

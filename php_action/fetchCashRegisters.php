@@ -11,7 +11,8 @@ $sql = "SELECT
     cr.*,
     (SELECT cs.session_id FROM cash_sessions cs WHERE cs.register_id = cr.register_id AND cs.status = 'open' ORDER BY cs.session_id DESC LIMIT 1) AS open_session_id,
     (SELECT cs.session_code FROM cash_sessions cs WHERE cs.register_id = cr.register_id AND cs.status = 'open' ORDER BY cs.session_id DESC LIMIT 1) AS open_session_code,
-    (SELECT cs.expected_cash FROM cash_sessions cs WHERE cs.register_id = cr.register_id AND cs.status = 'open' ORDER BY cs.session_id DESC LIMIT 1) AS open_expected_cash
+    (SELECT cs.expected_cash FROM cash_sessions cs WHERE cs.register_id = cr.register_id AND cs.status = 'open' ORDER BY cs.session_id DESC LIMIT 1) AS open_expected_cash,
+    (SELECT cs.bank_entity FROM cash_sessions cs WHERE cs.register_id = cr.register_id AND cs.status = 'open' ORDER BY cs.session_id DESC LIMIT 1) AS open_bank_entity
 FROM cash_registers cr
 WHERE cr.branch_id = ? AND cr.record_status = 1
 ORDER BY cr.register_id ASC";
@@ -28,10 +29,12 @@ while ($row = $res->fetch_assoc()) {
         'branch_id'         => (int)$row['branch_id'],
         'register_code'     => $row['register_code'],
         'register_name'     => $row['register_name'],
+        'bank_entity'       => $row['bank_entity'] ?: 'BCP',
         'location'          => $row['location'] ?? '',
         'active'            => (int)$row['active'],
         'open_session_id'   => $row['open_session_id'] !== null ? (int)$row['open_session_id'] : null,
         'open_session_code' => $row['open_session_code'] ?? null,
+        'open_bank_entity'  => $row['open_bank_entity'] ?: ($row['bank_entity'] ?: 'BCP'),
         'open_expected_cash' => $row['open_expected_cash'] !== null ? round((float)$row['open_expected_cash'], 2) : null,
     ];
 }

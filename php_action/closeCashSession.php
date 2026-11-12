@@ -107,6 +107,75 @@ try {
     $updSess->execute();
     $updSess->close();
 
+    // Fetch operations summary and breakdown by banking entity for closing report
+    $opStmt = $connect->prepare("SELECT
+        operation_type,
+        source_bank_entity,
+        destination_bank_entity,
+        amount,
+        commission_amount,
+        total_customer_amount
+    FROM branch_operations
+    WHERE session_id = ? AND branch_id = ?");
+    $opStmt->bind_param('ii', $sessionId, $branchId);
+    $opStmt->execute();
+    $opRes = $opStmt->get_result();
+
+    $opSummary = [
+        'total_count'           => 0,
+        'deposit_count'         => 0,
+        'deposit_amount'        => 0.0,
+        'withdrawal_count'      => 0,
+        'withdrawal_amount'     => 0.0,
+        'commission_total'      => 0.0,
+        'net_customer_flow'     => 0.0,
+    ];
+    $banksMap = [];
+
+    while ($op = $opRes->fetch_assoc()) {
+        $type = $op['operation_type'];
+        $amt = round((float)$op['amount'], 2);
+        $comm = round((float)$op['commission_amount'], 2);
+        $totCust = round((float)$op['total_customer_amount'], 2);
+        $sourceBank = $op['source_bank_entity'] ?: 'BCP';
+
+        $opSummary['total_count']++;
+        $opSummary['commission_total'] = round($opSummary['commission_total'] + $comm, 2);
+
+        if ($type === 'deposit') {
+            $opSummary['deposit_count']++;
+            $opSummary['deposit_amount'] = round($opSummary['deposit_amount'] + $amt, 2);
+            $opSummary['net_customer_flow'] = round($opSummary['net_customer_flow'] + $totCust, 2);
+        } else {
+            $opSummary['withdrawal_count']++;
+            $opSummary['withdrawal_amount'] = round($opSummary['withdrawal_amount'] + $amt, 2);
+            $opSummary['net_customer_flow'] = round($opSummary['net_customer_flow'] - $totCust, 2);
+        }
+
+        if (!isset($banksMap[$sourceBank])) {
+            $banksMap[$sourceBank] = [
+                'bank_entity'           => $sourceBank,
+                'deposit_count'         => 0,
+                'deposit_amount'        => 0.0,
+                'withdrawal_count'      => 0,
+                'withdrawal_amount'     => 0.0,
+                'commission_total'      => 0.0,
+                'net_flow'              => 0.0,
+            ];
+        }
+        $banksMap[$sourceBank]['commission_total'] = round($banksMap[$sourceBank]['commission_total'] + $comm, 2);
+        if ($type === 'deposit') {
+            $banksMap[$sourceBank]['deposit_count']++;
+            $banksMap[$sourceBank]['deposit_amount'] = round($banksMap[$sourceBank]['deposit_amount'] + $amt, 2);
+            $banksMap[$sourceBank]['net_flow'] = round($banksMap[$sourceBank]['net_flow'] + $totCust, 2);
+        } else {
+            $banksMap[$sourceBank]['withdrawal_count']++;
+            $banksMap[$sourceBank]['withdrawal_amount'] = round($banksMap[$sourceBank]['withdrawal_amount'] + $amt, 2);
+            $banksMap[$sourceBank]['net_flow'] = round($banksMap[$sourceBank]['net_flow'] - $totCust, 2);
+        }
+    }
+    $opStmt->close();
+
     $connect->commit();
     $connect->close();
 
@@ -116,12 +185,15 @@ try {
         'summary' => [
             'session_id' => $sessionId,
             'session_code' => $sess['session_code'],
+            'register_name' => $sess['register_name'],
             'expected_cash' => $expectedCash,
             'counted_cash' => $countedCash,
             'difference_amount' => $difference,
             'status_label' => $statusLabel,
             'amount_returned_general' => $returnAmount,
             'retained_float' => $retainedFloat,
+            'operations_summary' => $opSummary,
+            'bank_breakdown' => array_values($banksMap),
         ],
     ]);
 } catch (InvalidArgumentException $e) {

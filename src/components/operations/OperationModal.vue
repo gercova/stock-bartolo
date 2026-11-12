@@ -117,6 +117,88 @@
           </div>
         </div>
 
+        <!-- Banking Entities Section (Entidad de Origen del Fondo / Entidad de Destino del Cliente) -->
+        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200/80 pb-2">
+            <div class="flex items-center gap-1.5">
+              <Landmark class="h-4 w-4 text-indigo-600" />
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Entidades Financieras / Agente Multibanco
+              </span>
+            </div>
+            <span class="text-[11px] text-slate-500 font-medium">
+              Fondos y Destino
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Entidad de Origen (Fondo / Agente) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">
+                Entidad de Origen (Fondo del Agente) *
+              </label>
+              <select
+                v-model="form.source_bank_entity"
+                required
+                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none"
+              >
+                <option
+                  v-for="b in bankEntitiesList"
+                  :key="b.id"
+                  :value="b.name"
+                >
+                  {{ b.name }} {{ getOpenBankSessionText(b.name) }}
+                </option>
+              </select>
+              <div class="mt-1 flex items-center justify-between text-[11px]">
+                <span
+                  class="font-semibold"
+                  :class="activeSourceSession ? 'text-emerald-700' : 'text-rose-600'"
+                >
+                  {{ activeSourceSession ? `Disponible en caja: S/ ${Number(activeSourceSession.expected_cash || 0).toFixed(2)}` : '⚠ Sin caja abierta para este banco' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Entidad de Destino (Cliente) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">
+                Entidad de Destino (Cliente) *
+              </label>
+              <select
+                v-model="form.destination_bank_entity"
+                required
+                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-indigo-500 focus:outline-none"
+              >
+                <option
+                  v-for="b in bankEntitiesList"
+                  :key="b.id"
+                  :value="b.name"
+                >
+                  {{ b.name }} — {{ b.fullName }}
+                </option>
+              </select>
+              <p class="text-[11px] text-slate-500 mt-1">
+                Aparecerá en el comprobante del cliente.
+              </p>
+            </div>
+          </div>
+
+          <!-- N° Cuenta o Celular de Destino -->
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">
+              N° Cuenta / Tarjeta o Celular de Destino (Opcional)
+            </label>
+            <input
+              v-model.trim="form.destination_account"
+              type="text"
+              placeholder="Ej: 191-12345678-0-90 ó 987654321 (Yape / Plin)"
+              maxlength="60"
+              class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
         <!-- Client Selector Row: Select2 Input + Green Plus Button (RENIEC / SUNAT) -->
         <div class="space-y-1">
           <div class="flex items-center justify-between">
@@ -490,6 +572,23 @@
           />
         </div>
 
+        <!-- Insufficient Cash or No Open Bank Session Warning -->
+        <div
+          v-if="form.operation_type === 'withdrawal' && (!activeSourceSession || isInsufficientBalance)"
+          class="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800 space-y-1"
+        >
+          <div class="flex items-center gap-1.5 font-bold">
+            <AlertOctagon class="h-4 w-4 text-rose-600" />
+            <span>Fondos insuficientes para retiro</span>
+          </div>
+          <p v-if="!activeSourceSession">
+            No hay una caja registradora abierta para la entidad bancaria <strong>{{ form.source_bank_entity }}</strong> en esta sucursal. Abre una caja asignada a esta entidad antes de procesar el retiro.
+          </p>
+          <p v-else>
+            La caja asignada a <strong>{{ form.source_bank_entity }} ({{ activeSourceSession.register_name }})</strong> dispone de <strong>S/ {{ Number(activeSourceSession.expected_cash || 0).toFixed(2) }}</strong>, pero se requieren <strong>S/ {{ Number(cashRequired).toFixed(2) }}</strong> para completar este retiro.
+          </p>
+        </div>
+
         <!-- Footer Actions -->
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
           <button
@@ -542,8 +641,10 @@ import apiClient, { extractErrorMessage } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useClientsStore } from '@/stores/clients'
 import { useOperationsStore } from '@/stores/operations'
+import { useCashRegisterStore } from '@/stores/cashRegister'
 import { findUnsafeField, sanitizeInput, isValidEmail, sanitizeObject } from '@/utils/security'
 import { checkOpenCashSession, promptOpenCashRegister } from '@/utils/cashRegisterPrompt'
+import { BANK_ENTITIES, getBankEntity } from '@/utils/bankEntities'
 
 const props = defineProps({
   modelValue: {
@@ -558,7 +659,9 @@ const router = useRouter()
 const auth = useAuthStore()
 const clientsStore = useClientsStore()
 const operationsStore = useOperationsStore()
+const cashStore = useCashRegisterStore()
 
+const bankEntitiesList = BANK_ENTITIES
 const submitting = ref(false)
 const selectedClientObj = ref(null)
 
@@ -595,10 +698,31 @@ const isReniecDocValid = computed(() => {
 const form = reactive({
   client_id: '',
   operation_type: 'deposit',
+  source_bank_entity: 'BCP',
+  destination_bank_entity: 'Banco de la Nación',
+  destination_account: '',
   amount: '',
   commission_included: false,
   notes: '',
 })
+
+const activeSourceSession = computed(() => {
+  return (
+    (cashStore.openSessions || []).find(
+      (s) => (s.bank_entity || '').toLowerCase() === (form.source_bank_entity || '').toLowerCase()
+    ) || null
+  )
+})
+
+function getOpenBankSessionText(bankName) {
+  const sess = (cashStore.openSessions || []).find(
+    (s) => (s.bank_entity || '').toLowerCase() === (bankName || '').toLowerCase()
+  )
+  if (sess) {
+    return `[${sess.register_name} · S/ ${Number(sess.expected_cash || 0).toFixed(2)}]`
+  }
+  return ''
+}
 
 const activeBranchName = computed(() => auth.activeBranch?.branch_name || 'Sucursal')
 const centralCashBalance = computed(() => operationsStore.centralCashBalance || 0)
@@ -640,7 +764,8 @@ const cashRequired = computed(() => {
 
 const isInsufficientBalance = computed(() => {
   if (form.operation_type !== 'withdrawal') return false
-  return cashRequired.value > Number(centralCashBalance.value || 0)
+  if (!activeSourceSession.value) return true
+  return cashRequired.value > Number(activeSourceSession.value.expected_cash || 0)
 })
 
 const pointsEarned = computed(() => {
@@ -816,6 +941,9 @@ function close() {
 function resetForm() {
   form.client_id = ''
   form.operation_type = 'deposit'
+  form.source_bank_entity = cashStore.openSessions[0]?.bank_entity || 'BCP'
+  form.destination_bank_entity = 'Banco de la Nación'
+  form.destination_account = ''
   form.amount = ''
   form.commission_included = false
   form.notes = ''
@@ -836,6 +964,7 @@ async function handleSubmit() {
 
   const unsafe = findUnsafeField({
     'Notas / Observaciones': form.notes,
+    'Cuenta Destino': form.destination_account,
   })
   if (unsafe) {
     alert(`El campo "${unsafe}" contiene caracteres o código no permitidos por seguridad.`)
@@ -847,10 +976,15 @@ async function handleSubmit() {
     const res = await operationsStore.createOperation(sanitizeObject({
       client_id: form.client_id,
       operation_type: form.operation_type,
+      source_bank_entity: form.source_bank_entity,
+      destination_bank_entity: form.destination_bank_entity,
+      destination_account: form.destination_account,
       amount: form.amount,
       commission_included: form.commission_included,
       notes: form.notes,
     }))
+    // Refresh cash sessions so register cards and totals update immediately
+    await cashStore.fetchCashDashboard()
     emit('created', res.operation)
     close()
   } catch (err) {
@@ -879,7 +1013,13 @@ watch(
   () => props.modelValue,
   async (val) => {
     if (val) {
-      await verifyCashSession()
+      await Promise.all([
+        verifyCashSession(),
+        cashStore.fetchCashDashboard(),
+      ])
+      if (cashStore.openSessions.length > 0) {
+        form.source_bank_entity = cashStore.openSessions[0]?.bank_entity || 'BCP'
+      }
       if (clientsStore.clients.length === 0) {
         await clientsStore.fetchClients()
       }

@@ -35,6 +35,6 @@ $stmt->close();
 $connect->close();
 
 json_response([
-    'success' => true,
-    'messages' => 'Eliminado exitosamente',
+    'success'   => true,
+    'messages'  => 'Eliminado exitosamente',
 ]);

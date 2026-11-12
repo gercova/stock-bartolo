@@ -245,9 +245,29 @@ function sb_ensure_branch_cash_defaults(mysqli $connect, int $branchId, string $
     }
 }
 
-function sb_get_open_cash_session(mysqli $connect, int $branchId): ?array
+function sb_get_open_cash_session(mysqli $connect, int $branchId, ?string $bankEntity = null): ?array
 {
-    $stmt = $connect->prepare("SELECT cs.*, cr.register_code, cr.register_name, COALESCE(u.username, 'Sistema') AS opened_by_name
+    if ($bankEntity !== null && trim($bankEntity) !== '') {
+        $stmt = $connect->prepare("SELECT cs.*, cr.register_code, cr.register_name, cr.bank_entity AS register_bank_entity, COALESCE(u.username, 'Sistema') AS opened_by_name
+            FROM cash_sessions cs
+            INNER JOIN cash_registers cr ON cr.register_id = cs.register_id
+            LEFT JOIN users u ON u.user_id = cs.opened_by
+            WHERE cs.branch_id = ? AND cs.status = 'open' AND cs.bank_entity = ?
+            ORDER BY cs.session_id DESC
+            LIMIT 1 FOR UPDATE");
+        if ($stmt) {
+            $b = trim($bankEntity);
+            $stmt->bind_param('is', $branchId, $b);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($row) {
+                return $row;
+            }
+        }
+    }
+
+    $stmt = $connect->prepare("SELECT cs.*, cr.register_code, cr.register_name, cr.bank_entity AS register_bank_entity, COALESCE(u.username, 'Sistema') AS opened_by_name
         FROM cash_sessions cs
         INNER JOIN cash_registers cr ON cr.register_id = cs.register_id
         LEFT JOIN users u ON u.user_id = cs.opened_by

@@ -14,6 +14,8 @@ $docType    = trim((string)($_GET['document_type'] ?? ''));
 $status     = isset($_GET['status']) && $_GET['status'] !== '' ? (int)$_GET['status'] : null;
 $branchId   = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
 
+$pagination = sb_get_pagination_params(25, 250);
+
 // Mandatory soft delete filter: only records with record_status = 1 are active
 $where  = ['c.record_status = 1'];
 $params = [];
@@ -62,6 +64,18 @@ if ($branchId !== null && $branchId > 0) {
 }
 
 $whereSql   = implode(' AND ', $where);
+
+// Count total matching clients
+$countSql = "SELECT COUNT(*) as total FROM clients c WHERE {$whereSql}";
+$cStmt = $connect->prepare($countSql);
+if (!empty($params)) {
+    $cStmt->bind_param($types, ...$params);
+}
+$cStmt->execute();
+$totalRow = $cStmt->get_result()->fetch_assoc();
+$total = (int)($totalRow['total'] ?? 0);
+$cStmt->close();
+
 $sql        = "SELECT 
             c.client_id,
             c.branch_id,
@@ -94,9 +108,19 @@ $sql        = "SELECT
         WHERE {$whereSql}
         ORDER BY c.client_id DESC";
 
+$dataParams = $params;
+$dataTypes = $types;
+
+if ($pagination['enabled']) {
+    $sql .= " LIMIT ? OFFSET ?";
+    $dataParams[] = $pagination['limit'];
+    $dataParams[] = $pagination['offset'];
+    $dataTypes .= 'ii';
+}
+
 $stmt = $connect->prepare($sql);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
+if (!empty($dataParams)) {
+    $stmt->bind_param($dataTypes, ...$dataParams);
 }
 $stmt->execute();
 $res = $stmt->get_result();
@@ -154,9 +178,11 @@ $stats = [
 
 $connect->close();
 
-json_response([
-    'success'   => true,
-    'data'      => $clients,
-    'stats'     => $stats,
-]);
+$meta = sb_build_pagination_meta($total, $pagination);
 
+json_response([
+    'success'    => true,
+    'data'       => $clients,
+    'pagination' => $meta,
+    'stats'      => $stats,
+]);

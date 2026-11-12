@@ -9,6 +9,7 @@
           type="text"
           placeholder="Buscar categoría..."
           class="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          @input="triggerSearch"
         />
       </div>
       <button
@@ -28,7 +29,7 @@
         Cargando categorías...
       </div>
 
-      <div v-else-if="filtered.length === 0" class="p-10 text-center text-sm text-slate-500">
+      <div v-else-if="items.length === 0" class="p-10 text-center text-sm text-slate-500">
         No se encontraron categorías.
       </div>
 
@@ -44,7 +45,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in filtered" :key="item.categories_id" class="hover:bg-slate-50/70 transition">
+              <tr v-for="item in items" :key="item.categories_id" class="hover:bg-slate-50/70 transition">
                 <td class="px-5 py-3.5 font-semibold text-slate-900">{{ item.categories_name }}</td>
                 <td class="px-5 py-3.5">
                   <StatusBadge
@@ -79,7 +80,7 @@
 
         <!-- Mobile Card List -->
         <div class="md:hidden divide-y divide-slate-100">
-          <div v-for="item in filtered" :key="item.categories_id" class="p-4 space-y-3">
+          <div v-for="item in items" :key="item.categories_id" class="p-4 space-y-3">
             <div class="flex items-start justify-between gap-2">
               <p class="font-semibold text-slate-900">{{ item.categories_name }}</p>
               <StatusBadge
@@ -107,6 +108,17 @@
             </div>
           </div>
         </div>
+
+        <!-- Pagination / Chunk Loading -->
+        <DataTablePagination
+          v-model:chunkMode="chunkMode"
+          :pagination="store.pagination"
+          :loading="loading"
+          item-label="categorías"
+          @page-change="onPageChange"
+          @per-page-change="onPerPageChange"
+          @load-next-chunk="onLoadNextChunk"
+        />
       </template>
     </div>
 
@@ -181,12 +193,18 @@ import { findUnsafeField } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
 const store = useCategoriesStore()
 const ui = useUiStore()
 const { items, loading } = storeToRefs(store)
 
 const search = ref('')
+const page = ref(1)
+const perPage = ref(25)
+const chunkMode = ref(false)
+let searchDebounceTimer = null
+
 const modalOpen = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
@@ -198,11 +216,37 @@ const form = reactive({
   status: 1,
 })
 
-const filtered = computed(() => {
-  const q = search.value.toLowerCase()
-  if (!q) return items.value
-  return items.value.filter((c) => c.categories_name.toLowerCase().includes(q))
-})
+function loadCategories(append = false) {
+  const params = {
+    page: append ? (store.pagination.page + 1) : page.value,
+    per_page: perPage.value,
+  }
+  if (search.value) params.search = search.value
+  return store.fetchCategories(params, append)
+}
+
+function triggerSearch() {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    loadCategories(false)
+  }, 350)
+}
+
+function onPageChange(newPage) {
+  page.value = newPage
+  loadCategories(false)
+}
+
+function onPerPageChange(newPerPage) {
+  perPage.value = newPerPage
+  page.value = 1
+  loadCategories(false)
+}
+
+function onLoadNextChunk() {
+  loadCategories(true)
+}
 
 function openCreate() {
   editingId.value = null
@@ -245,6 +289,7 @@ async function submitForm() {
       ui.success('Categoría creada exitosamente.')
     }
     modalOpen.value = false
+    loadCategories(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -263,6 +308,7 @@ async function confirmDelete() {
     await store.deleteCategory(deletingItem.value.categories_id)
     ui.success('Categoría eliminada exitosamente.')
     deletingItem.value = null
+    loadCategories(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -270,5 +316,5 @@ async function confirmDelete() {
   }
 }
 
-onMounted(() => store.fetchCategories())
+onMounted(() => loadCategories(false))
 </script>

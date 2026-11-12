@@ -77,6 +77,12 @@
                     {{ reg.register_code }}
                   </span>
                   <StatusBadge variant="success" :label="`Abierta · ${sessionByRegister(reg.register_id).session_code}`" />
+                  <span
+                    class="rounded-md px-2 py-0.5 text-xs font-bold border"
+                    :class="getBankBadgeClass(sessionByRegister(reg.register_id).bank_entity || reg.bank_entity)"
+                  >
+                    {{ sessionByRegister(reg.register_id).bank_entity || reg.bank_entity || 'BCP' }}
+                  </span>
                 </div>
                 <h3 class="mt-1.5 text-base font-bold text-slate-900">
                   {{ reg.register_name }}
@@ -183,6 +189,12 @@
                     {{ reg.register_code }}
                   </span>
                   <StatusBadge :variant="reg.active === 1 ? 'neutral' : 'danger'" :label="reg.active === 1 ? 'Cerrada · Disponible' : 'Inactiva'" />
+                  <span
+                    class="rounded-md px-2 py-0.5 text-xs font-bold border"
+                    :class="getBankBadgeClass(reg.bank_entity)"
+                  >
+                    {{ reg.bank_entity || 'BCP' }}
+                  </span>
                 </div>
                 <h3 class="mt-2 text-base font-bold text-slate-900">{{ reg.register_name }}</h3>
                 <p class="text-xs text-slate-500 mt-0.5">
@@ -289,6 +301,7 @@
                   <tr>
                     <th class="px-4 py-3.5">Turno</th>
                     <th class="px-4 py-3.5">Caja</th>
+                    <th class="px-4 py-3.5">Entidad</th>
                     <th class="px-4 py-3.5">Apertura / Cierre</th>
                     <th class="px-4 py-3.5 text-right">Inicial</th>
                     <th class="px-4 py-3.5 text-right">Esperado</th>
@@ -305,6 +318,14 @@
                     <td class="px-4 py-3.5">
                       <p class="font-semibold text-slate-900">{{ s.register_name }}</p>
                       <p class="text-xs text-slate-500">{{ s.register_code }}</p>
+                    </td>
+                    <td class="px-4 py-3.5">
+                      <span
+                        class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold border"
+                        :class="getBankBadgeClass(s.bank_entity)"
+                      >
+                        {{ s.bank_entity || 'BCP' }}
+                      </span>
                     </td>
                     <td class="px-4 py-3.5 text-xs text-slate-600">
                       <p>Ap: {{ formatDateTime(s.opened_at) }} ({{ s.opened_by_name }})</p>
@@ -436,6 +457,17 @@
                 </div>
               </div>
             </div>
+
+            <!-- Pagination / Chunk Loading -->
+            <DataTablePagination
+              v-model:chunkMode="chunkMode"
+              :pagination="store.pagination"
+              :loading="store.loading"
+              item-label="turnos de caja"
+              @page-change="onPageChange"
+              @per-page-change="onPerPageChange"
+              @load-next-chunk="onLoadNextChunk"
+            />
           </template>
         </div>
       </div>
@@ -465,6 +497,7 @@
                 <tr>
                   <th class="px-5 py-3.5">Código</th>
                   <th class="px-5 py-3.5">Nombre de caja</th>
+                  <th class="px-5 py-3.5">Entidad</th>
                   <th class="px-5 py-3.5">Ubicación</th>
                   <th class="px-5 py-3.5">Estado</th>
                   <th class="px-5 py-3.5">Turno</th>
@@ -475,6 +508,14 @@
                 <tr v-for="reg in store.registers" :key="reg.register_id" class="hover:bg-slate-50/70 transition">
                   <td class="px-5 py-3.5 font-mono text-xs font-bold text-slate-700">{{ reg.register_code }}</td>
                   <td class="px-5 py-3.5 font-semibold text-slate-900">{{ reg.register_name }}</td>
+                  <td class="px-5 py-3.5">
+                    <span
+                      class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold border"
+                      :class="getBankBadgeClass(reg.bank_entity)"
+                    >
+                      {{ reg.bank_entity || 'BCP' }}
+                    </span>
+                  </td>
                   <td class="px-5 py-3.5 text-slate-600">{{ reg.location || '—' }}</td>
                   <td class="px-5 py-3.5">
                     <StatusBadge :variant="reg.active === 1 ? 'success' : 'neutral'" :label="reg.active === 1 ? 'Activa' : 'Inactiva'" />
@@ -594,6 +635,7 @@
       :session="targetSession"
       :auto-return-default="Boolean(store.systemConfig?.auto_return_till_to_general_cash ?? true)"
       @close="closeModalOpen = false"
+      @closed="onSessionClosed"
     />
 
     <CashSessionDetailModal
@@ -637,6 +679,7 @@ import { useCashRegisterStore } from '@/stores/cashRegister'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency, formatDateTime } from '@/utils/formatters'
+import { getBankBadgeClass, getBankEntity } from '@/utils/bankEntities'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CashRegisterModal from '@/components/cash/CashRegisterModal.vue'
@@ -645,6 +688,7 @@ import CashMovementModal from '@/components/cash/CashMovementModal.vue'
 import ReconcileCashModal from '@/components/cash/ReconcileCashModal.vue'
 import CloseCashModal from '@/components/cash/CloseCashModal.vue'
 import CashSessionDetailModal from '@/components/cash/CashSessionDetailModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
 const auth = useAuthStore()
 const store = useCashRegisterStore()
@@ -653,6 +697,33 @@ const ui = useUiStore()
 const subTab = ref('sessions')
 const sessionSearch = ref('')
 const sessionStatusFilter = ref('all')
+
+const page = ref(1)
+const perPage = ref(25)
+const chunkMode = ref(false)
+
+function loadSessions(append = false) {
+  const params = {
+    page: append ? (store.pagination.page + 1) : page.value,
+    per_page: perPage.value,
+  }
+  return store.fetchCashDashboard(params, append)
+}
+
+function onPageChange(newPage) {
+  page.value = newPage
+  loadSessions(false)
+}
+
+function onPerPageChange(newPerPage) {
+  perPage.value = newPerPage
+  page.value = 1
+  loadSessions(false)
+}
+
+function onLoadNextChunk() {
+  loadSessions(true)
+}
 
 const registerModalOpen = ref(false)
 const editingRegister = ref(null)
@@ -722,6 +793,13 @@ function openReconcileModal(session) {
 function openCloseModal(session) {
   targetSession.value = session
   closeModalOpen.value = true
+}
+
+async function onSessionClosed(sessionId) {
+  closeModalOpen.value = false
+  if (sessionId) {
+    await openDetailModal(sessionId)
+  }
 }
 
 async function openDetailModal(sessionId) {

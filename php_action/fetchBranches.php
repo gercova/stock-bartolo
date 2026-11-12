@@ -3,9 +3,9 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET']);
 
-$userId = (int)$_SESSION['userId'];
+$userId         = (int)($_SESSION['userId'] ?? 0);
 $activeBranchId = get_active_branch_id($connect);
-$canSwitch = sb_user_can_switch_branches($connect, $userId);
+$canSwitch      = sb_user_can_switch_branches($connect, $userId);
 
 $sql = "SELECT
     b.*,
@@ -26,13 +26,13 @@ WHERE b.record_status = 1 " . ($canSwitch ? '' : 'AND b.branch_id = ? ') . "
 ORDER BY b.is_main DESC, b.branch_id ASC";
 
 if ($canSwitch) {
-    $res = $connect->query($sql);
-    $stmt = null;
+    $res    = $connect->query($sql);
+    $stmt   = null;
 } else {
-    $stmt = $connect->prepare($sql);
+    $stmt   = $connect->prepare($sql);
     $stmt->bind_param('i', $activeBranchId);
     $stmt->execute();
-    $res = $stmt->get_result();
+    $res    = $stmt->get_result();
 }
 
 $branches = [];
@@ -40,13 +40,13 @@ if ($res) {
     while ($row = $res->fetch_assoc()) {
         $item = sb_format_branch_row($row);
         $item['is_active_tenant'] = ((int)$row['branch_id'] === $activeBranchId);
-        $item['general_cash'] = [
-            'account_id' => (int)$row['account_id'],
-            'account_name' => (string)$row['account_name'],
-            'current_balance' => round((float)$row['general_cash_balance'], 2),
-            'initial_capital' => round((float)$row['initial_capital'], 2),
+        $item['general_cash']   = [
+            'account_id'        => (int)$row['account_id'],
+            'account_name'      => (string)$row['account_name'],
+            'current_balance'   => round((float)$row['general_cash_balance'], 2),
+            'initial_capital'   => round((float)$row['initial_capital'], 2),
             'min_balance_alert' => round((float)$row['min_balance_alert'], 2),
-            'status' => (int)$row['general_cash_status'],
+            'status'            => (int)$row['general_cash_status'],
         ];
         $item['registers_count'] = (int)$row['registers_count'];
         $item['open_sessions_count'] = (int)$row['open_sessions_count'];
@@ -65,10 +65,10 @@ $activeBranch = get_active_branch($connect);
 $connect->close();
 
 json_response([
-    'success' => true,
-    'activeBranchId' => $activeBranchId,
-    'activeBranch' => $activeBranch,
-    'canSwitch' => $canSwitch,
-    'data' => $branches,
+    'success'           => true,
+    'activeBranchId'    => $activeBranchId,
+    'activeBranch'      => $activeBranch,
+    'canSwitch'         => $canSwitch,
+    'data'              => $branches,
 ]);
 

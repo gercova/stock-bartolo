@@ -10,11 +10,13 @@
             type="text"
             placeholder="Buscar cliente, teléfono o # orden..."
             class="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            @input="triggerSearch"
           />
         </div>
         <select
           v-model="statusFilter"
           class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          @change="page = 1; loadOrders(false)"
         >
           <option value="all">Todos los estados</option>
           <option value="1">Pago completo</option>
@@ -40,7 +42,7 @@
         Cargando órdenes...
       </div>
 
-      <div v-else-if="filtered.length === 0" class="p-10 text-center text-sm text-slate-500">
+      <div v-else-if="items.length === 0" class="p-10 text-center text-sm text-slate-500">
         No se encontraron órdenes.
       </div>
 
@@ -62,7 +64,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="order in filtered" :key="order.order_id" class="hover:bg-slate-50/70 transition">
+              <tr v-for="order in items" :key="order.order_id" class="hover:bg-slate-50/70 transition">
                 <td class="px-5 py-3.5 font-mono text-xs text-slate-500">#{{ order.order_id }}</td>
                 <td class="px-5 py-3.5 text-slate-600">{{ formatDate(order.order_date) }}</td>
                 <td class="px-5 py-3.5 font-semibold text-slate-900">{{ order.client_name }}</td>
@@ -120,7 +122,7 @@
 
         <!-- Mobile & Tablet Cards -->
         <div class="lg:hidden divide-y divide-slate-100">
-          <div v-for="order in filtered" :key="order.order_id" class="p-4 space-y-3">
+          <div v-for="order in items" :key="order.order_id" class="p-4 space-y-3">
             <div class="flex items-start justify-between gap-2">
               <div>
                 <p class="font-semibold text-slate-900">{{ order.client_name }}</p>
@@ -182,6 +184,17 @@
             </div>
           </div>
         </div>
+
+        <!-- Pagination / Chunk Loading -->
+        <DataTablePagination
+          v-model:chunkMode="chunkMode"
+          :pagination="store.pagination"
+          :loading="loading"
+          item-label="órdenes"
+          @page-change="onPageChange"
+          @per-page-change="onPerPageChange"
+          @load-next-chunk="onLoadNextChunk"
+        />
       </template>
     </div>
 
@@ -297,6 +310,7 @@ import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import OrderReceiptModal from '@/components/orders/OrderReceiptModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -306,6 +320,11 @@ const { items, loading } = storeToRefs(store)
 
 const search = ref('')
 const statusFilter = ref('all')
+const page = ref(1)
+const perPage = ref(25)
+const chunkMode = ref(false)
+let searchDebounceTimer = null
+
 const paymentTarget = ref(null)
 const savingPayment = ref(false)
 const printData = ref(null)
@@ -318,6 +337,39 @@ const paymentForm = reactive({
   paymentStatus: 1,
 })
 
+function loadOrders(append = false) {
+  const params = {
+    page: append ? (store.pagination.page + 1) : page.value,
+    per_page: perPage.value,
+  }
+  if (search.value) params.search = search.value
+  if (statusFilter.value !== 'all') params.payment_status = statusFilter.value
+  return store.fetchOrders(params, append)
+}
+
+function triggerSearch() {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    loadOrders(false)
+  }, 350)
+}
+
+function onPageChange(newPage) {
+  page.value = newPage
+  loadOrders(false)
+}
+
+function onPerPageChange(newPerPage) {
+  perPage.value = newPerPage
+  page.value = 1
+  loadOrders(false)
+}
+
+function onLoadNextChunk() {
+  loadOrders(true)
+}
+
 async function goToCreateOrder() {
   const cashStatus = await checkOpenCashSession()
   if (!cashStatus.isOpen) {
@@ -326,22 +378,6 @@ async function goToCreateOrder() {
   }
   router.push('/orders/create')
 }
-
-const filtered = computed(() => {
-  const q = search.value.toLowerCase()
-  return items.value.filter((o) => {
-    const matchesSearch =
-      !q ||
-      o.client_name.toLowerCase().includes(q) ||
-      o.client_contact.toLowerCase().includes(q) ||
-      String(o.order_id).includes(q)
-    if (!matchesSearch) return false
-    if (statusFilter.value !== 'all') {
-      return String(o.payment_status) === statusFilter.value
-    }
-    return true
-  })
-})
 
 async function openPaymentModal(order) {
   const cashStatus = await checkOpenCashSession()
@@ -367,6 +403,7 @@ async function submitPayment() {
     })
     ui.success('Pago actualizado exitosamente.')
     paymentTarget.value = null
+    loadOrders(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -440,6 +477,7 @@ async function confirmDelete() {
     await store.deleteOrder(deletingOrder.value.order_id)
     ui.success('Orden eliminada exitosamente.')
     deletingOrder.value = null
+    loadOrders(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -447,5 +485,5 @@ async function confirmDelete() {
   }
 }
 
-onMounted(() => store.fetchOrders())
+onMounted(() => loadOrders(false))
 </script>

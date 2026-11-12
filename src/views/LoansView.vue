@@ -53,11 +53,13 @@
             type="text"
             placeholder="Buscar cliente, código o teléfono..."
             class="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            @input="triggerSearch"
           />
         </div>
         <select
           v-model="statusFilter"
           class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          @change="page = 1; loadLoans(false)"
         >
           <option value="all">Todos los estados</option>
           <option value="1">Activos</option>
@@ -68,6 +70,7 @@
         <select
           v-model="interestFilter"
           class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          @change="page = 1; loadLoans(false)"
         >
           <option value="all">Interés: Todos</option>
           <option value="with">Con interés</option>
@@ -92,7 +95,7 @@
         Cargando préstamos...
       </div>
 
-      <div v-else-if="filtered.length === 0" class="p-10 text-center space-y-2">
+      <div v-else-if="items.length === 0" class="p-10 text-center space-y-2">
         <p class="text-sm text-slate-500">No hay préstamos que coincidan con el filtro actual.</p>
         <button
           type="button"
@@ -121,7 +124,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="loan in filtered" :key="loan.loan_id" class="hover:bg-slate-50/70 transition">
+              <tr v-for="loan in items" :key="loan.loan_id" class="hover:bg-slate-50/70 transition">
                 <td class="px-4 py-3.5">
                   <p class="font-mono text-xs font-bold text-slate-700">{{ loan.loan_code }}</p>
                   <p class="text-[11px] text-slate-400">Por: {{ loan.issued_by }}</p>
@@ -196,7 +199,7 @@
 
         <!-- Mobile & Tablet Cards -->
         <div class="xl:hidden divide-y divide-slate-100">
-          <div v-for="loan in filtered" :key="loan.loan_id" class="p-4 space-y-3">
+          <div v-for="loan in items" :key="loan.loan_id" class="p-4 space-y-3">
             <div class="flex items-start justify-between gap-2">
               <div>
                 <div class="flex items-center gap-2">
@@ -268,6 +271,17 @@
             </div>
           </div>
         </div>
+
+        <!-- Pagination / Chunk Loading -->
+        <DataTablePagination
+          v-model:chunkMode="chunkMode"
+          :pagination="store.pagination"
+          :loading="loading"
+          item-label="préstamos"
+          @page-change="onPageChange"
+          @per-page-change="onPerPageChange"
+          @load-next-chunk="onLoadNextChunk"
+        />
       </template>
     </div>
 
@@ -341,6 +355,7 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import LoanFormModal from '@/components/loans/LoanFormModal.vue'
 import LoanPaymentModal from '@/components/loans/LoanPaymentModal.vue'
 import LoanDetailModal from '@/components/loans/LoanDetailModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -352,6 +367,11 @@ const { items, summary, currentLoan, currentPayments, loading } = storeToRefs(st
 const search = ref('')
 const statusFilter = ref('all')
 const interestFilter = ref('all')
+
+const page = ref(1)
+const perPage = ref(25)
+const chunkMode = ref(false)
+let searchDebounceTimer = null
 
 const formOpen = ref(false)
 const editingLoan = ref(null)
@@ -366,21 +386,40 @@ const savingPayment = ref(false)
 const deletingLoan = ref(null)
 const deleting = ref(false)
 
-const filtered = computed(() => {
-  const q = search.value.toLowerCase()
-  return items.value.filter((l) => {
-    const matchesSearch =
-      !q ||
-      l.client_name.toLowerCase().includes(q) ||
-      l.loan_code.toLowerCase().includes(q) ||
-      l.client_contact.toLowerCase().includes(q)
-    if (!matchesSearch) return false
-    if (statusFilter.value !== 'all' && String(l.loan_status) !== statusFilter.value) return false
-    if (interestFilter.value === 'with' && !l.has_interest) return false
-    if (interestFilter.value === 'without' && l.has_interest) return false
-    return true
-  })
-})
+function loadLoans(append = false) {
+  const params = {
+    page: append ? (store.pagination.page + 1) : page.value,
+    per_page: perPage.value,
+  }
+  if (search.value) params.search = search.value
+  if (statusFilter.value !== 'all') params.status = statusFilter.value
+  if (interestFilter.value === 'with') params.has_interest = '1'
+  else if (interestFilter.value === 'without') params.has_interest = '0'
+  return store.fetchLoans(params, append)
+}
+
+function triggerSearch() {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    loadLoans(false)
+  }, 350)
+}
+
+function onPageChange(newPage) {
+  page.value = newPage
+  loadLoans(false)
+}
+
+function onPerPageChange(newPerPage) {
+  perPage.value = newPerPage
+  page.value = 1
+  loadLoans(false)
+}
+
+function onLoadNextChunk() {
+  loadLoans(true)
+}
 
 async function openCreate() {
   const cashStatus = await checkOpenCashSession()
@@ -442,6 +481,7 @@ async function handleLoanSubmit(payload) {
       ui.success(`Préstamo ${res?.loan_code || ''} emitido exitosamente.`)
     }
     formOpen.value = false
+    loadLoans(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -458,6 +498,7 @@ async function handlePaymentSubmit(payload) {
     if (currentLoan.value) {
       selectedLoan.value = currentLoan.value
     }
+    loadLoans(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -472,6 +513,7 @@ async function confirmDelete() {
     await store.deleteLoan(deletingLoan.value.loan_id)
     ui.success('Préstamo eliminado exitosamente.')
     deletingLoan.value = null
+    loadLoans(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -480,7 +522,7 @@ async function confirmDelete() {
 }
 
 onMounted(() => {
-  store.fetchLoans()
+  loadLoans(false)
   ordersStore.fetchOrders()
 })
 </script>

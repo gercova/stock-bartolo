@@ -10,11 +10,13 @@
             type="text"
             placeholder="Buscar producto, fabricante o categoría..."
             class="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            @input="triggerSearch"
           />
         </div>
         <select
           v-model="statusFilter"
           class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          @change="page = 1; loadProducts(false)"
         >
           <option value="all">Todos los estados</option>
           <option value="1">Disponibles</option>
@@ -40,7 +42,7 @@
         Cargando productos...
       </div>
 
-      <div v-else-if="filtered.length === 0" class="p-10 text-center text-sm text-slate-500">
+      <div v-else-if="items.length === 0" class="p-10 text-center text-sm text-slate-500">
         No se encontraron productos.
       </div>
 
@@ -60,7 +62,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in filtered" :key="item.product_id" class="hover:bg-slate-50/70 transition">
+              <tr v-for="item in items" :key="item.product_id" class="hover:bg-slate-50/70 transition">
                 <td class="px-5 py-3.5">
                   <div class="flex items-center gap-3">
                     <img
@@ -113,7 +115,7 @@
 
         <!-- Mobile Cards -->
         <div class="md:hidden divide-y divide-slate-100">
-          <div v-for="item in filtered" :key="item.product_id" class="p-4 space-y-3">
+          <div v-for="item in items" :key="item.product_id" class="p-4 space-y-3">
             <div class="flex items-start gap-3">
               <img
                 :src="imageSrc(item.product_image)"
@@ -159,6 +161,19 @@
             </div>
           </div>
         </div>
+
+        <!-- Pagination & Chunk Loading Controls -->
+        <DataTablePagination
+          :pagination="productsStore.pagination"
+          :loading="loading"
+          :loaded-count="items.length"
+          :chunk-mode="chunkMode"
+          entity-name="productos"
+          @change-page="onPageChange"
+          @change-per-page="onPerPageChange"
+          @load-next-chunk="onLoadNextChunk"
+          @update:chunk-mode="chunkMode = $event"
+        />
       </template>
     </div>
 
@@ -363,6 +378,7 @@ import { findUnsafeField } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
 const productsStore = useProductsStore()
 const brandsStore = useBrandsStore()
@@ -373,6 +389,10 @@ const { items, loading } = storeToRefs(productsStore)
 
 const search = ref('')
 const statusFilter = ref('all')
+const page = ref(1)
+const perPage = ref(25)
+const chunkMode = ref(false)
+let searchDebounceTimer = null
 const modalOpen = ref(false)
 const editingId = ref(null)
 const editTab = ref('info')
@@ -399,22 +419,46 @@ const activeCategories = computed(() =>
   categoriesStore.items.filter((c) => c.categories_active === 1 || c.categories_id === form.categoriesId)
 )
 
-const filtered = computed(() => {
-  const q = search.value.toLowerCase()
-  return items.value.filter((p) => {
-    const matchesSearch =
-      !q ||
-      p.product_name.toLowerCase().includes(q) ||
-      p.brand_name.toLowerCase().includes(q) ||
-      p.categories_name.toLowerCase().includes(q)
+function triggerSearch() {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    loadProducts(false)
+  }, 250)
+}
 
-    if (!matchesSearch) return false
-    if (statusFilter.value === '1') return p.active === 1
-    if (statusFilter.value === '2') return p.active === 2
-    if (statusFilter.value === 'low') return p.quantity <= 3
-    return true
-  })
-})
+async function loadProducts(append = false) {
+  try {
+    await productsStore.fetchProducts(
+      {
+        page: page.value,
+        per_page: perPage.value,
+        search: search.value,
+        status: statusFilter.value,
+      },
+      append
+    )
+  } catch (err) {
+    ui.error(extractErrorMessage(err))
+  }
+}
+
+function onPageChange(newPage) {
+  page.value = newPage
+  loadProducts(false)
+}
+
+function onPerPageChange(newPerPage) {
+  perPage.value = newPerPage
+  page.value = 1
+  loadProducts(false)
+}
+
+function onLoadNextChunk() {
+  const currentChunk = productsStore.pagination?.page || 1
+  page.value = currentChunk + 1
+  loadProducts(true)
+}
 
 function imageSrc(path) {
   if (!path) return '/assests/images/photo_default.png'
@@ -504,6 +548,7 @@ async function submitProductForm() {
       ui.success('Producto creado exitosamente.')
     }
     modalOpen.value = false
+    await loadProducts(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -525,6 +570,7 @@ async function submitPhotoForm() {
     selectedFile.value = null
     revokePreviewUrl()
     ui.success('Imagen actualizada exitosamente.')
+    await loadProducts(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -543,6 +589,7 @@ async function confirmDelete() {
     await productsStore.deleteProduct(deletingItem.value.product_id)
     ui.success('Producto eliminado exitosamente.')
     deletingItem.value = null
+    await loadProducts(false)
   } catch (err) {
     ui.error(extractErrorMessage(err))
   } finally {
@@ -551,7 +598,7 @@ async function confirmDelete() {
 }
 
 onMounted(() => {
-  productsStore.fetchProducts()
+  loadProducts(false)
   brandsStore.fetchBrands()
   categoriesStore.fetchCategories()
 })

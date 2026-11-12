@@ -12,6 +12,7 @@ $registerId             = (int)($data['registerId'] ?? 0);
 $openingAmount          = round((float)($data['openingAmount'] ?? 0), 2);
 $fundFromGeneralCash    = !empty($data['fundFromGeneralCash']);
 $openingNotes           = sanitize_clean_text($data['openingNotes'] ?? '', 'notas de apertura', 255, false);
+$rawBankEntity          = sanitize_clean_text($data['bankEntity'] ?? '', 'entidad bancaria', 60, false);
 
 if ($registerId <= 0 || $openingAmount < 0) {
     send_http_error(400, 'Selecciona una caja válida e indica un monto de apertura mayor o igual a $0.00.');
@@ -22,7 +23,7 @@ sb_ensure_branch_cash_defaults($connect, $branchId, $activeBranch['branch_name']
 $connect->begin_transaction();
 
 try {
-    $regStmt = $connect->prepare('SELECT register_id, register_code, register_name, active FROM cash_registers WHERE register_id = ? AND branch_id = ? AND record_status = 1 LIMIT 1 FOR UPDATE');
+    $regStmt = $connect->prepare('SELECT register_id, register_code, register_name, bank_entity, active FROM cash_registers WHERE register_id = ? AND branch_id = ? AND record_status = 1 LIMIT 1 FOR UPDATE');
     $regStmt->bind_param('ii', $registerId, $branchId);
     $regStmt->execute();
     $reg = $regStmt->get_result()->fetch_assoc();
@@ -34,6 +35,15 @@ try {
     if ((int)$reg['active'] !== 1) {
         throw new InvalidArgumentException('La caja registradora seleccionada está inactiva.');
     }
+
+    $bankEntity = $rawBankEntity !== '' ? $rawBankEntity : ($reg['bank_entity'] ?: 'BCP');
+    $bankCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $bankEntity), 0, 16));
+
+    // Persist chosen bank entity on register
+    $updRegBank = $connect->prepare('UPDATE cash_registers SET bank_entity = ? WHERE register_id = ?');
+    $updRegBank->bind_param('si', $bankEntity, $registerId);
+    $updRegBank->execute();
+    $updRegBank->close();
 
     $openChk = $connect->prepare("SELECT session_id FROM cash_sessions WHERE register_id = ? AND branch_id = ? AND status = 'open' LIMIT 1 FOR UPDATE");
     $openChk->bind_param('ii', $registerId, $branchId);
@@ -66,8 +76,8 @@ try {
     $tempCode = 'TURN-TMP';
     $fundedInt = ($fundFromGeneralCash && $openingAmount > 0) ? 1 : 0;
 
-    $insSess = $connect->prepare("INSERT INTO cash_sessions (branch_id, register_id, session_code, opened_by, opened_at, opening_amount, funded_from_general_cash, cash_in_total, cash_out_total, non_cash_sales_total, expected_cash, status, opening_notes) VALUES (?, ?, ?, ?, NOW(), ?, ?, 0.00, 0.00, 0.00, ?, 'open', ?)");
-    $insSess->bind_param('iisidids', $branchId, $registerId, $tempCode, $userId, $openingAmount, $fundedInt, $openingAmount, $openingNotes);
+    $insSess = $connect->prepare("INSERT INTO cash_sessions (branch_id, register_id, session_code, bank_entity, bank_entity_code, opened_by, opened_at, opening_amount, funded_from_general_cash, cash_in_total, cash_out_total, non_cash_sales_total, expected_cash, status, opening_notes) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, 0.00, 0.00, 0.00, ?, 'open', ?)");
+    $insSess->bind_param('iisssidids', $branchId, $registerId, $tempCode, $bankEntity, $bankCode, $userId, $openingAmount, $fundedInt, $openingAmount, $openingNotes);
     $insSess->execute();
     $sessionId = (int)$connect->insert_id;
     $insSess->close();
@@ -101,9 +111,10 @@ try {
 
     json_response([
         'success' => true,
-        'messages' => "Caja {$reg['register_name']} abierta exitosamente ({$sessionCode})",
+        'messages' => "Caja {$reg['register_name']} abierta exitosamente ({$sessionCode}) para entidad {$bankEntity}",
         'session_id' => $sessionId,
         'session_code' => $sessionCode,
+        'bank_entity' => $bankEntity,
     ], 201);
 } catch (InvalidArgumentException $e) {
     $connect->rollback();

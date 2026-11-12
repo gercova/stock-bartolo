@@ -257,6 +257,18 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Users Pagination / Chunk Loading -->
+        <DataTablePagination
+          v-if="secStore.users.length > 0"
+          v-model:chunkMode="userChunkMode"
+          :pagination="secStore.userPagination"
+          :loading="secStore.loadingUsers"
+          item-label="usuarios"
+          @page-change="onUserPageChange"
+          @per-page-change="onUserPerPageChange"
+          @load-next-chunk="onUserLoadNextChunk"
+        />
       </div>
     </div>
 
@@ -488,6 +500,18 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Audit Pagination / Chunk Loading -->
+        <DataTablePagination
+          v-if="secStore.auditLogs.length > 0"
+          v-model:chunkMode="auditChunkMode"
+          :pagination="secStore.auditPagination"
+          :loading="secStore.loadingAudit"
+          item-label="registros de auditoría"
+          @page-change="onAuditPageChange"
+          @per-page-change="onAuditPerPageChange"
+          @load-next-chunk="onAuditLoadNextChunk"
+        />
       </div>
     </div>
 
@@ -551,6 +575,7 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import UserModal from '@/components/security/UserModal.vue'
 import RoleModal from '@/components/security/RoleModal.vue'
 import AuditDetailModal from '@/components/security/AuditDetailModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 import { useSecurityStore } from '@/stores/security'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -574,6 +599,14 @@ const selectedAuditLog = ref(null)
 const confirmDeleteOpen = ref(false)
 const itemToDelete = ref(null)
 const deleteType = ref('user')
+
+const userPage = ref(1)
+const userPerPage = ref(25)
+const userChunkMode = ref(false)
+
+const auditPage = ref(1)
+const auditPerPage = ref(25)
+const auditChunkMode = ref(false)
 
 const canCreateUser = computed(() => auth.can('users', 'create'))
 const canUpdateUser = computed(() => auth.can('users', 'update'))
@@ -599,7 +632,8 @@ let userSearchTimeout = null
 function handleUserSearchInput() {
   clearTimeout(userSearchTimeout)
   userSearchTimeout = setTimeout(() => {
-    loadUsers()
+    userPage.value = 1
+    loadUsers(false)
   }, 300)
 }
 
@@ -607,16 +641,37 @@ let auditSearchTimeout = null
 function handleAuditSearchInput() {
   clearTimeout(auditSearchTimeout)
   auditSearchTimeout = setTimeout(() => {
-    loadAuditLogs()
+    auditPage.value = 1
+    loadAuditLogs(false)
   }, 300)
 }
 
-async function loadUsers() {
+async function loadUsers(append = false) {
   try {
-    await secStore.fetchUsers(userFilters)
+    const params = {
+      ...userFilters,
+      page: append ? (secStore.userPagination.page + 1) : userPage.value,
+      per_page: userPerPage.value,
+    }
+    await secStore.fetchUsers(params, append)
   } catch (err) {
     ui.error(extractErrorMessage(err, 'Error al cargar usuarios.'))
   }
+}
+
+function onUserPageChange(newPage) {
+  userPage.value = newPage
+  loadUsers(false)
+}
+
+function onUserPerPageChange(newPerPage) {
+  userPerPage.value = newPerPage
+  userPage.value = 1
+  loadUsers(false)
+}
+
+function onUserLoadNextChunk() {
+  loadUsers(true)
 }
 
 async function loadRoles() {
@@ -627,19 +682,40 @@ async function loadRoles() {
   }
 }
 
-async function loadAuditLogs() {
+async function loadAuditLogs(append = false) {
   try {
-    await secStore.fetchAuditLogs(auditFilters)
+    const params = {
+      ...auditFilters,
+      page: append ? (secStore.auditPagination.page + 1) : auditPage.value,
+      per_page: auditPerPage.value,
+    }
+    await secStore.fetchAuditLogs(params, append)
   } catch (err) {
     ui.error(extractErrorMessage(err, 'Error al consultar logs de auditoría.'))
   }
+}
+
+function onAuditPageChange(newPage) {
+  auditPage.value = newPage
+  loadAuditLogs(false)
+}
+
+function onAuditPerPageChange(newPerPage) {
+  auditPerPage.value = newPerPage
+  auditPage.value = 1
+  loadAuditLogs(false)
+}
+
+function onAuditLoadNextChunk() {
+  loadAuditLogs(true)
 }
 
 function resetAuditFilters() {
   auditFilters.search = ''
   auditFilters.module = 'all'
   auditFilters.action = 'all'
-  loadAuditLogs()
+  auditPage.value = 1
+  loadAuditLogs(false)
 }
 
 function openCreateUserModal() {
@@ -662,6 +738,7 @@ async function handleSaveUser(payload) {
       ui.success(res?.messages || 'Usuario creado correctamente.')
     }
     userModalOpen.value = false
+    loadUsers(false)
   } catch (err) {
     ui.error(extractErrorMessage(err, 'Error al guardar usuario.'))
   }
@@ -726,6 +803,7 @@ async function handleConfirmDelete() {
     if (deleteType.value === 'user') {
       const res = await secStore.removeUser(itemToDelete.value.user_id)
       ui.success(res?.messages || 'Usuario eliminado o desactivado correctamente.')
+      loadUsers(false)
     } else {
       const res = await secStore.removeRole(itemToDelete.value.role_id)
       ui.success(res?.messages || 'Rol eliminado correctamente.')

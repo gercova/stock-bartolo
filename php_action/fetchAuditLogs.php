@@ -12,8 +12,9 @@ $actionFilter = trim((string)($_GET['action'] ?? ''));
 $userIdFilter = isset($_GET['userId']) && $_GET['userId'] !== '' ? (int)$_GET['userId'] : null;
 $branchIdFilter = isset($_GET['branchId']) && $_GET['branchId'] !== '' ? (int)$_GET['branchId'] : null;
 $search = trim((string)($_GET['search'] ?? ''));
-$limit = min(500, max(10, (int)($_GET['limit'] ?? 100)));
-$offset = max(0, (int)($_GET['offset'] ?? 0));
+$pagination = sb_get_pagination_params(25, 250);
+$limit = $pagination['limit'] ?? 25;
+$offset = $pagination['offset'] ?? 0;
 
 $where = ['1=1'];
 $params = [];
@@ -165,6 +166,7 @@ json_response([
     'total' => $totalRecords,
     'limit' => $limit,
     'offset' => $offset,
+    'pagination' => sb_build_pagination_meta($totalRecords, $pagination),
     'stats' => $stats,
 ]);
 

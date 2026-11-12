@@ -51,6 +51,8 @@ $breakdown = [
     'manual_out'            => 0.0,
     'expense'               => 0.0,
     'sweep_to_general'      => 0.0,
+    'operation_deposit'     => 0.0,
+    'operation_withdrawal'  => 0.0,
 ];
 
 while ($m = $mRes->fetch_assoc()) {
@@ -76,6 +78,102 @@ while ($m = $mRes->fetch_assoc()) {
     ];
 }
 $mStmt->close();
+
+// Fetch operations associated with this session (for consolidated report and bank breakdown)
+$opStmt = $connect->prepare("SELECT
+    o.*,
+    c.name AS client_name,
+    c.document_type,
+    c.document_number,
+    COALESCE(u.username, 'Cajero') AS cashier_name
+FROM branch_operations o
+INNER JOIN clients c ON o.client_id = c.client_id
+LEFT JOIN users u ON o.user_id = u.user_id
+WHERE o.session_id = ? AND o.branch_id = ?
+ORDER BY o.operation_id DESC");
+$opStmt->bind_param('ii', $sessionId, $branchId);
+$opStmt->execute();
+$opRes = $opStmt->get_result();
+
+$operations = [];
+$opSummary = [
+    'total_count'           => 0,
+    'deposit_count'         => 0,
+    'deposit_amount'        => 0.0,
+    'withdrawal_count'      => 0,
+    'withdrawal_amount'     => 0.0,
+    'commission_total'      => 0.0,
+    'net_customer_flow'     => 0.0,
+];
+
+$banksMap = [];
+
+while ($op = $opRes->fetch_assoc()) {
+    $type = $op['operation_type'];
+    $amt = round((float)$op['amount'], 2);
+    $comm = round((float)$op['commission_amount'], 2);
+    $totCust = round((float)$op['total_customer_amount'], 2);
+    $sourceBank = $op['source_bank_entity'] ?: 'BCP';
+    $destBank = $op['destination_bank_entity'] ?: 'BCP';
+
+    $opSummary['total_count']++;
+    $opSummary['commission_total'] = round($opSummary['commission_total'] + $comm, 2);
+
+    if ($type === 'deposit') {
+        $opSummary['deposit_count']++;
+        $opSummary['deposit_amount'] = round($opSummary['deposit_amount'] + $amt, 2);
+        $opSummary['net_customer_flow'] = round($opSummary['net_customer_flow'] + $totCust, 2);
+    } else {
+        $opSummary['withdrawal_count']++;
+        $opSummary['withdrawal_amount'] = round($opSummary['withdrawal_amount'] + $amt, 2);
+        $opSummary['net_customer_flow'] = round($opSummary['net_customer_flow'] - $totCust, 2);
+    }
+
+    if (!isset($banksMap[$sourceBank])) {
+        $banksMap[$sourceBank] = [
+            'bank_entity'           => $sourceBank,
+            'deposit_count'         => 0,
+            'deposit_amount'        => 0.0,
+            'withdrawal_count'      => 0,
+            'withdrawal_amount'     => 0.0,
+            'commission_total'      => 0.0,
+            'net_flow'              => 0.0,
+        ];
+    }
+    $banksMap[$sourceBank]['commission_total'] = round($banksMap[$sourceBank]['commission_total'] + $comm, 2);
+    if ($type === 'deposit') {
+        $banksMap[$sourceBank]['deposit_count']++;
+        $banksMap[$sourceBank]['deposit_amount'] = round($banksMap[$sourceBank]['deposit_amount'] + $amt, 2);
+        $banksMap[$sourceBank]['net_flow'] = round($banksMap[$sourceBank]['net_flow'] + $totCust, 2);
+    } else {
+        $banksMap[$sourceBank]['withdrawal_count']++;
+        $banksMap[$sourceBank]['withdrawal_amount'] = round($banksMap[$sourceBank]['withdrawal_amount'] + $amt, 2);
+        $banksMap[$sourceBank]['net_flow'] = round($banksMap[$sourceBank]['net_flow'] - $totCust, 2);
+    }
+
+    $operations[] = [
+        'operation_id'              => (int)$op['operation_id'],
+        'operation_code'            => $op['operation_code'],
+        'operation_type'            => $type,
+        'source_bank_entity'        => $sourceBank,
+        'destination_bank_entity'   => $destBank,
+        'destination_account'       => $op['destination_account'] ?? '',
+        'amount'                    => $amt,
+        'commission_amount'         => $comm,
+        'commission_included'       => ((int)$op['commission_included']) === 1,
+        'net_amount'                => round((float)$op['net_amount'], 2),
+        'total_customer_amount'     => $totCust,
+        'points_earned'             => (int)$op['points_earned'],
+        'client_name'               => $op['client_name'],
+        'document_type'             => $op['document_type'],
+        'document_number'           => $op['document_number'],
+        'cashier_name'              => $op['cashier_name'],
+        'created_at'                => $op['created_at'],
+    ];
+}
+$opStmt->close();
+
+$bankBreakdown = array_values($banksMap);
 
 // Reconciliations
 $rStmt = $connect->prepare("SELECT rec.*, COALESCE(u.username, 'Sistema') AS username FROM cash_reconciliations rec LEFT JOIN users u ON u.user_id = rec.user_id WHERE rec.session_id = ? AND rec.branch_id = ? ORDER BY rec.reconciliation_id DESC");
@@ -123,6 +221,8 @@ json_response([
         'register_id'       => (int)$row['register_id'],
         'register_code'     => $row['register_code'] ?? '',
         'register_name'     => $row['register_name'] ?? 'Caja',
+        'bank_entity'       => $row['bank_entity'] ?: 'BCP',
+        'bank_entity_code'  => $row['bank_entity_code'] ?? null,
         'location'          => $row['location'] ?? '',
         'session_code'      => $row['session_code'],
         'opened_by'         => (int)$row['opened_by'],
@@ -150,6 +250,9 @@ json_response([
         'closing_notes'     => $row['closing_notes'] ?? '',
     ],
     'breakdown'             => $breakdown,
+    'operations_summary'    => $opSummary,
+    'bank_breakdown'        => $bankBreakdown,
+    'operations'            => $operations,
     'movements'             => $movements,
     'reconciliations'       => $reconciliations,
 ]);

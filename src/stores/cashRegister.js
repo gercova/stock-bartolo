@@ -41,21 +41,40 @@ export const useCashRegisterStore = defineStore('cashRegister', () => {
   const registers     = ref([])
   const openSessions  = ref([])
   const sessions      = ref([])
+  const pagination    = ref({
+    total: 0,
+    page: 1,
+    per_page: 25,
+    total_pages: 1,
+    has_more: false,
+    from: 0,
+    to: 0,
+    chunk_size: 25,
+    current_chunk: 1,
+    total_chunks: 1,
+  })
 
   const currentDetail = ref(null)
   const loading       = ref(false)
   const loadingDetail = ref(false)
 
-  async function fetchCashDashboard() {
+  async function fetchCashDashboard(params = {}, append = false) {
     loading.value = true
     try {
-      const { data }      = await apiClient.get('/fetchCashSessions.php')
+      const { data }      = await apiClient.get('/fetchCashSessions.php', { params })
       activeBranch.value  = data?.activeBranch || null
       systemConfig.value  = data?.systemConfig || null
       generalCash.value   = data?.generalCash || null
       registers.value     = data?.registers || []
       openSessions.value  = data?.openSessions || []
-      sessions.value      = data?.sessions || []
+      if (append) {
+        sessions.value = [...sessions.value, ...(data?.sessions || [])]
+      } else {
+        sessions.value = data?.sessions || []
+      }
+      if (data?.pagination) {
+        pagination.value = data.pagination
+      }
       return data
     } finally {
       loading.value = false
@@ -139,6 +158,7 @@ export const useCashRegisterStore = defineStore('cashRegister', () => {
     registers,
     openSessions,
     sessions,
+    pagination,
     currentDetail,
     loading,
     loadingDetail,

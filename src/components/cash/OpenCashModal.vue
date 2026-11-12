@@ -20,12 +20,44 @@
             :key="r.register_id"
             :value="r.register_id"
           >
-            {{ r.register_code }} — {{ r.register_name }}{{ r.location ? ` (${r.location})` : '' }}
+            {{ r.register_code }} — {{ r.register_name }} [{{ r.bank_entity || 'BCP' }}]{{ r.location ? ` (${r.location})` : '' }}
           </option>
         </select>
         <p v-if="availableRegisters.length === 0" class="text-xs text-rose-600 mt-1">
           No hay cajas disponibles en esta sucursal (todas están abiertas o inactivas).
         </p>
+      </div>
+
+      <!-- Selector de Entidad Bancaria (Cada entidad maneja su propio fondo y capital) -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">
+          Entidad Bancaria Asignada (Fondo/Capital) *
+        </label>
+        <div class="relative">
+          <select
+            v-model="form.bankEntity"
+            required
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          >
+            <option
+              v-for="bank in bankEntitiesList"
+              :key="bank.id"
+              :value="bank.name"
+            >
+              {{ bank.name }} — {{ bank.fullName }}
+            </option>
+          </select>
+        </div>
+        <div class="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
+          <span
+            v-if="selectedBankInfo"
+            class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold border"
+            :class="selectedBankInfo.badgeClass"
+          >
+            {{ selectedBankInfo.name }}
+          </span>
+          <span>Cada entidad maneja su saldo operativo independiente para depósitos y retiros.</span>
+        </div>
       </div>
 
       <div>
@@ -107,6 +139,7 @@ import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency } from '@/utils/formatters'
 import { findUnsafeField } from '@/utils/security'
+import { BANK_ENTITIES, getBankEntity } from '@/utils/bankEntities'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -121,9 +154,11 @@ const emit = defineEmits(['close', 'opened'])
 const store = useCashRegisterStore()
 const ui = useUiStore()
 
+const bankEntitiesList = BANK_ENTITIES
 const saving = ref(false)
 const form = reactive({
   registerId: 0,
+  bankEntity: 'BCP',
   openingAmount: 0,
   fundFromGeneralCash: true,
   openingNotes: '',
@@ -133,6 +168,8 @@ const availableRegisters = computed(() =>
   (props.registers || []).filter((r) => Number(r.active) === 1 && !r.open_session_id)
 )
 
+const selectedBankInfo = computed(() => getBankEntity(form.bankEntity))
+
 watch(
   () => props.open,
   (isOpen) => {
@@ -140,12 +177,23 @@ watch(
     const candidate = availableRegisters.value.find(
       (r) => r.register_id === props.preselectedRegisterId
     )
-    form.registerId = candidate
-      ? candidate.register_id
-      : availableRegisters.value[0]?.register_id || 0
+    const chosen = candidate || availableRegisters.value[0] || null
+    form.registerId = chosen?.register_id || 0
+    form.bankEntity = chosen?.bank_entity || 'BCP'
     form.openingAmount = 0
     form.fundFromGeneralCash = Boolean(props.autoFundDefault) && props.generalCashBalance > 0
     form.openingNotes = ''
+  }
+)
+
+watch(
+  () => form.registerId,
+  (newId) => {
+    if (!newId) return
+    const reg = availableRegisters.value.find((r) => r.register_id === newId)
+    if (reg?.bank_entity) {
+      form.bankEntity = reg.bank_entity
+    }
   }
 )
 
@@ -160,6 +208,7 @@ async function submitForm() {
   try {
     const res = await store.openSession({
       registerId: form.registerId,
+      bankEntity: form.bankEntity,
       openingAmount: form.openingAmount,
       fundFromGeneralCash: form.fundFromGeneralCash,
       openingNotes: form.openingNotes,

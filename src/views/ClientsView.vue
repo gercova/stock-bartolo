@@ -353,6 +353,18 @@
           </div>
         </div>
       </div>
+
+      <!-- Pagination / Chunk Loading -->
+      <DataTablePagination
+        v-if="clientsStore.clients.length > 0"
+        v-model:chunkMode="chunkMode"
+        :pagination="clientsStore.pagination"
+        :loading="clientsStore.loading"
+        item-label="clientes"
+        @page-change="onPageChange"
+        @per-page-change="onPerPageChange"
+        @load-next-chunk="onLoadNextChunk"
+      />
     </div>
 
     <!-- Modals -->
@@ -395,6 +407,7 @@ import {
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import ClientModal from '@/components/clients/ClientModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 import { useClientsStore } from '@/stores/clients'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -408,6 +421,10 @@ const modalOpen = ref(false)
 const selectedClient = ref(null)
 const confirmDeleteOpen = ref(false)
 const clientToDelete = ref(null)
+
+const page = ref(1)
+const perPage = ref(25)
+const chunkMode = ref(false)
 
 const canCreate = computed(() => auth.can('clients', 'create'))
 const canUpdate = computed(() => auth.can('clients', 'update'))
@@ -424,13 +441,15 @@ let searchTimeout = null
 function handleSearchInput() {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    loadClients()
+    page.value = 1
+    loadClients(false)
   }, 300)
 }
 
 function setClientTypeFilter(type) {
   filters.client_type = type
-  loadClients()
+  page.value = 1
+  loadClients(false)
 }
 
 function resetFilters() {
@@ -438,17 +457,36 @@ function resetFilters() {
   filters.client_type = 'all'
   filters.document_type = 'all'
   filters.status = 'all'
-  loadClients()
+  page.value = 1
+  loadClients(false)
 }
 
-async function loadClients() {
+function onPageChange(newPage) {
+  page.value = newPage
+  loadClients(false)
+}
+
+function onPerPageChange(newPerPage) {
+  perPage.value = newPerPage
+  page.value = 1
+  loadClients(false)
+}
+
+function onLoadNextChunk() {
+  loadClients(true)
+}
+
+async function loadClients(append = false) {
   try {
-    await clientsStore.fetchClients({
+    const params = {
+      page: append ? (clientsStore.pagination.page + 1) : page.value,
+      per_page: perPage.value,
       search: filters.search,
       client_type: filters.client_type,
       document_type: filters.document_type,
       status: filters.status,
-    })
+    }
+    await clientsStore.fetchClients(params, append)
   } catch (err) {
     ui.error(extractErrorMessage(err, 'No fue posible cargar el padrón de clientes.'))
   }
@@ -474,6 +512,7 @@ async function handleSaveClient(payload) {
       ui.success(res?.messages || 'Cliente registrado correctamente.')
     }
     modalOpen.value = false
+    loadClients(false)
   } catch (err) {
     ui.error(extractErrorMessage(err, 'Error al guardar el cliente.'))
   }
@@ -496,6 +535,7 @@ async function handleConfirmDelete() {
     ui.success(res?.messages || 'Registro eliminado mediante borrado lógico.')
     confirmDeleteOpen.value = false
     clientToDelete.value = null
+    loadClients(false)
   } catch (err) {
     ui.error(extractErrorMessage(err, 'Error al eliminar el registro.'))
   }

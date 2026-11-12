@@ -43,8 +43,8 @@ function sb_load_env(?string $path = null): array
 
         // Strip surrounding quotes if present
         if (strlen($val) >= 2) {
-            $first = $val[0];
-            $last = $val[strlen($val) - 1];
+            $first  = $val[0];
+            $last   = $val[strlen($val) - 1];
             if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
                 $val = substr($val, 1, -1);
             }

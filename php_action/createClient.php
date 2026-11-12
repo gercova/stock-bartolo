@@ -80,7 +80,7 @@ if ($softRow) {
         client_type = ?, status = ?, record_status = 1, deleted_at = NULL, notes = ?, updated_at = NOW()
         WHERE client_id = ?');
     $updRevive->bind_param(
-        'issssssssssssisisi',
+        'isssssssssssssisi',
         $branchId, $docType, $docNumber, $name, $firstName, $lastName,
         $email, $phone, $address, $department, $province, $district, $ubigeo,
         $clientType, $status, $notes, $reuseId

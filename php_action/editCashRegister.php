@@ -9,6 +9,8 @@ $data       = get_request_data();
 $registerId     = (int)($data['registerId'] ?? 0);
 $registerCode   = strtoupper(preg_replace('/[^A-Za-z0-9\-_]/', '', sanitize_clean_text($data['registerCode'] ?? '', 'código de caja', 32, true)));
 $registerName   = sanitize_clean_text($data['registerName'] ?? '', 'nombre de caja', 120, true);
+$bankEntity     = sanitize_clean_text($data['bankEntity'] ?? ($data['bank_entity'] ?? 'BCP'), 'entidad bancaria', 60, false);
+if ($bankEntity === '') $bankEntity = 'BCP';
 $location       = sanitize_clean_text($data['location'] ?? '', 'ubicación', 150, false);
 $active         = (int)($data['active'] ?? 1);
 
@@ -49,8 +51,8 @@ if ($dupRow) {
     send_http_error(400, "El código {$registerCode} ya pertenece a otra caja en esta sucursal.");
 }
 
-$stmt = $connect->prepare('UPDATE cash_registers SET register_code = ?, register_name = ?, location = ?, active = ? WHERE register_id = ? AND branch_id = ?');
-$stmt->bind_param('sssiii', $registerCode, $registerName, $location, $active, $registerId, $branchId);
+$stmt = $connect->prepare('UPDATE cash_registers SET register_code = ?, register_name = ?, bank_entity = ?, location = ?, active = ? WHERE register_id = ? AND branch_id = ?');
+$stmt->bind_param('ssssiii', $registerCode, $registerName, $bankEntity, $location, $active, $registerId, $branchId);
 
 if (!$stmt->execute()) {
     $stmt->close();

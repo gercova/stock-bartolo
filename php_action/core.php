@@ -28,6 +28,7 @@ require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/ensure_schema.php';
 require_once __DIR__ . '/tenant.php';
 require_once __DIR__ . '/security_roles.php';
+require_once __DIR__ . '/pagination.php';
 
 ensure_app_schema($connect);
 

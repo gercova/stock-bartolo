@@ -303,6 +303,7 @@
                 <th class="py-3 px-4">Código / Fecha</th>
                 <th class="py-3 px-4">Cliente</th>
                 <th class="py-3 px-4 text-center">Tipo</th>
+                <th class="py-3 px-4 text-center">Entidad (Origen → Destino)</th>
                 <th class="py-3 px-4 text-right">Monto Base</th>
                 <th class="py-3 px-4 text-right">Comisión (1/100)</th>
                 <th class="py-3 px-4 text-right">Total Transacción</th>
@@ -339,6 +340,30 @@
                     <ArrowUpRight v-else class="h-3 w-3" />
                     {{ op.operation_type === 'deposit' ? 'Depósito' : 'Retiro' }}
                   </span>
+                </td>
+
+                <!-- Bank Entities (Origen -> Destino) -->
+                <td class="py-3 px-4 text-center">
+                  <div class="inline-flex items-center gap-1 text-[11px]">
+                    <span
+                      class="rounded px-1.5 py-0.5 font-bold border"
+                      :class="getBankBadgeClass(op.source_bank_entity)"
+                      title="Entidad de Origen (Fondo Agente)"
+                    >
+                      {{ op.source_bank_entity || 'BCP' }}
+                    </span>
+                    <span class="text-slate-400 font-bold">→</span>
+                    <span
+                      class="rounded px-1.5 py-0.5 font-bold border"
+                      :class="getBankBadgeClass(op.destination_bank_entity)"
+                      title="Entidad de Destino (Cliente)"
+                    >
+                      {{ op.destination_bank_entity || 'BCP' }}
+                    </span>
+                  </div>
+                  <p v-if="op.destination_account" class="text-[10px] text-slate-500 font-mono mt-0.5 truncate max-w-[130px] mx-auto">
+                    {{ op.destination_account }}
+                  </p>
                 </td>
 
                 <!-- Amount -->
@@ -393,6 +418,19 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination & Chunk Loading Controls for Operations -->
+        <DataTablePagination
+          :pagination="store.pagination"
+          :loading="store.loading"
+          :loaded-count="store.operations.length"
+          :chunk-mode="opChunkMode"
+          entity-name="operaciones"
+          @change-page="onOpPageChange"
+          @change-per-page="onOpPerPageChange"
+          @load-next-chunk="onOpLoadNextChunk"
+          @update:chunk-mode="opChunkMode = $event"
+        />
       </div>
     </div>
 
@@ -616,6 +654,19 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination & Chunk Loading Controls for Loyalty Ranking -->
+        <DataTablePagination
+          :pagination="store.rankingPagination"
+          :loading="store.loading"
+          :loaded-count="store.leaderboard.length"
+          :chunk-mode="rankChunkMode"
+          entity-name="clientes clasificados"
+          @change-page="onRankPageChange"
+          @change-per-page="onRankPerPageChange"
+          @load-next-chunk="onRankLoadNextChunk"
+          @update:chunk-mode="rankChunkMode = $event"
+        />
       </div>
     </div>
 
@@ -809,17 +860,22 @@ import { useUiStore } from '@/stores/ui'
 import { useOperationsStore } from '@/stores/operations'
 import { useClientsStore } from '@/stores/clients'
 import { checkOpenCashSession, promptOpenCashRegister } from '@/utils/cashRegisterPrompt'
+import { getBankBadgeClass } from '@/utils/bankEntities'
 
 import OperationModal from '@/components/operations/OperationModal.vue'
 import ReceiptTicketModal from '@/components/operations/ReceiptTicketModal.vue'
 import RedeemRewardModal from '@/components/operations/RedeemRewardModal.vue'
 import PointsHistoryModal from '@/components/operations/PointsHistoryModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 const store = useOperationsStore()
 const clientsStore = useClientsStore()
+
+const opChunkMode = ref(false)
+const rankChunkMode = ref(false)
 
 // Cash Session State
 const hasOpenCashSession = ref(true)
@@ -882,17 +938,43 @@ function refreshActiveTab() {
   switchTab(activeTab.value)
 }
 
+function onOpPageChange(page) {
+  store.fetchOperations({ page }, false)
+}
+
+function onOpPerPageChange(perPage) {
+  store.pagination.per_page = perPage
+  store.fetchOperations({ page: 1, per_page: perPage }, false)
+}
+
+function onOpLoadNextChunk() {
+  store.fetchOperations({}, true)
+}
+
+function onRankPageChange(page) {
+  store.fetchLoyaltyRanking({ page, search: rankingSearch.value }, false)
+}
+
+function onRankPerPageChange(perPage) {
+  store.rankingPagination.per_page = perPage
+  store.fetchLoyaltyRanking({ page: 1, per_page: perPage, search: rankingSearch.value }, false)
+}
+
+function onRankLoadNextChunk() {
+  store.fetchLoyaltyRanking({ search: rankingSearch.value }, true)
+}
+
 function debounceFetchOperations() {
   clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
-    store.fetchOperations()
+    store.fetchOperations({ page: 1 }, false)
   }, 350)
 }
 
 function debounceFetchRanking() {
   clearTimeout(rankingDebounceTimer)
   rankingDebounceTimer = setTimeout(() => {
-    store.fetchLoyaltyRanking(null, rankingSearch.value)
+    store.fetchLoyaltyRanking({ page: 1, search: rankingSearch.value }, false)
   }, 350)
 }
 
@@ -901,7 +983,7 @@ function resetFilters() {
   store.filters.endDate = ''
   store.filters.operation_type = 'all'
   store.filters.search = ''
-  store.fetchOperations()
+  store.fetchOperations({ page: 1 }, false)
 }
 
 async function openNewOperationModal() {

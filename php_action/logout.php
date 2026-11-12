@@ -5,7 +5,7 @@ require_once __DIR__ . '/core.php';
 
 require_method(['POST']);
 
-$userId = !empty($_SESSION['userId']) ? (int)$_SESSION['userId'] : null;
+$userId   = !empty($_SESSION['userId']) ? (int)$_SESSION['userId'] : null;
 $username = !empty($_SESSION['username']) ? (string)$_SESSION['username'] : null;
 $branchId = !empty($_SESSION['active_branch_id']) ? (int)$_SESSION['active_branch_id'] : null;
 

@@ -34,6 +34,22 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Entidad Bancaria Asignada *</label>
+          <select
+            v-model="form.bankEntity"
+            required
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          >
+            <option
+              v-for="b in bankEntitiesList"
+              :key="b.id"
+              :value="b.name"
+            >
+              {{ b.name }} ({{ b.shortName }})
+            </option>
+          </select>
+        </div>
+        <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">Ubicación / Área</label>
           <input
             v-model.trim="form.location"
@@ -43,16 +59,17 @@
             class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none"
           />
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Estado *</label>
-          <select
-            v-model.number="form.active"
-            class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-          >
-            <option :value="1">Activa</option>
-            <option :value="2">Inactiva</option>
-          </select>
-        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Estado *</label>
+        <select
+          v-model.number="form.active"
+          class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+        >
+          <option :value="1">Activa</option>
+          <option :value="2">Inactiva</option>
+        </select>
       </div>
     </form>
 
@@ -86,6 +103,7 @@ import { useCashRegisterStore } from '@/stores/cashRegister'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { findUnsafeField } from '@/utils/security'
+import { BANK_ENTITIES } from '@/utils/bankEntities'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -97,12 +115,14 @@ const emit = defineEmits(['close', 'saved'])
 const store = useCashRegisterStore()
 const ui = useUiStore()
 
+const bankEntitiesList = BANK_ENTITIES
 const isEdit = computed(() => Boolean(props.register?.register_id))
 const saving = ref(false)
 
 const form = reactive({
   registerCode: '',
   registerName: '',
+  bankEntity: 'BCP',
   location: '',
   active: 1,
 })
@@ -114,11 +134,13 @@ watch(
     if (props.register) {
       form.registerCode = props.register.register_code || ''
       form.registerName = props.register.register_name || ''
+      form.bankEntity = props.register.bank_entity || 'BCP'
       form.location = props.register.location || ''
       form.active = Number(props.register.active || 1)
     } else {
       form.registerCode = ''
       form.registerName = ''
+      form.bankEntity = 'BCP'
       form.location = ''
       form.active = 1
     }
@@ -144,6 +166,7 @@ async function submitForm() {
         registerId: props.register.register_id,
         registerCode: form.registerCode,
         registerName: form.registerName,
+        bankEntity: form.bankEntity,
         location: form.location,
         active: form.active,
       })
@@ -152,6 +175,7 @@ async function submitForm() {
       const res = await store.createRegister({
         registerCode: form.registerCode,
         registerName: form.registerName,
+        bankEntity: form.bankEntity,
         location: form.location,
         active: form.active,
       })

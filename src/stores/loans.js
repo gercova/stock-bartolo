@@ -37,6 +37,18 @@ export function calculateLoanPreview({
 
 export const useLoansStore = defineStore('loans', () => {
   const items = ref([])
+  const pagination = ref({
+    total: 0,
+    page: 1,
+    per_page: 25,
+    total_pages: 1,
+    has_more: false,
+    from: 0,
+    to: 0,
+    chunk_size: 25,
+    current_chunk: 1,
+    total_chunks: 1,
+  })
   const summary = ref({
     totalLoans: 0,
     activeLoans: 0,
@@ -54,15 +66,22 @@ export const useLoansStore = defineStore('loans', () => {
   const currentPayments = ref([])
   const loading = ref(false)
 
-  async function fetchLoans() {
+  async function fetchLoans(params = {}, append = false) {
     loading.value = true
     try {
-      const { data } = await apiClient.get('/fetchLoan.php')
-      items.value = data?.data || []
+      const { data } = await apiClient.get('/fetchLoan.php', { params })
+      if (append) {
+        items.value = [...items.value, ...(data?.data || [])]
+      } else {
+        items.value = data?.data || []
+      }
+      if (data?.pagination) {
+        pagination.value = data.pagination
+      }
       if (data?.summary) {
         summary.value = data.summary
       }
-      return items.value
+      return data
     } finally {
       loading.value = false
     }
@@ -79,30 +98,27 @@ export const useLoansStore = defineStore('loans', () => {
 
   async function createLoan(payload) {
     const { data } = await apiClient.post('/createLoan.php', payload)
-    await fetchLoans()
     return data
   }
 
   async function updateLoan(payload) {
     const { data } = await apiClient.post('/editLoan.php', payload)
-    await fetchLoans()
     return data
   }
 
   async function addPayment(payload) {
     const { data } = await apiClient.post('/addLoanPayment.php', payload)
-    await fetchLoans()
     return data
   }
 
   async function deleteLoan(loanId) {
     const { data } = await apiClient.post('/removeLoan.php', { loanId })
-    await fetchLoans()
     return data
   }
 
   return {
     items,
+    pagination,
     summary,
     currentLoan,
     currentPayments,

@@ -8,6 +8,8 @@ $activeBranch   = get_active_branch($connect);
 $config         = sb_get_system_config($connect);
 sb_ensure_branch_cash_defaults($connect, $branchId, $activeBranch['branch_name'], 0.0, (int)$_SESSION['userId']);
 
+$pagination     = sb_get_pagination_params(25, 250);
+
 // General cash balance for this branch
 $gcStmt = $connect->prepare('SELECT account_id, account_name, current_balance, min_balance_alert, status FROM general_cash_accounts WHERE branch_id = ? LIMIT 1');
 $gcStmt->bind_param('i', $branchId);
@@ -32,12 +34,21 @@ while ($r = $regRes->fetch_assoc()) {
         'branch_id'     => (int)$r['branch_id'],
         'register_code' => $r['register_code'],
         'register_name' => $r['register_name'],
+        'bank_entity'   => $r['bank_entity'] ?: 'BCP',
         'location'      => $r['location'] ?? '',
         'active'        => (int)$r['active'],
         'open_session_id' => $r['open_session_id'] !== null ? (int)$r['open_session_id'] : null,
     ];
 }
 $regStmt->close();
+
+// Count total sessions for active branch
+$cStmt = $connect->prepare('SELECT COUNT(*) AS total FROM cash_sessions WHERE branch_id = ?');
+$cStmt->bind_param('i', $branchId);
+$cStmt->execute();
+$totalRow = $cStmt->get_result()->fetch_assoc();
+$total = (int)($totalRow['total'] ?? 0);
+$cStmt->close();
 
 // Sessions in active branch
 $sessSql = "SELECT
@@ -53,11 +64,20 @@ LEFT JOIN cash_registers cr ON cr.register_id = cs.register_id
 LEFT JOIN users uo ON uo.user_id = cs.opened_by
 LEFT JOIN users uc ON uc.user_id = cs.closed_by
 WHERE cs.branch_id = ?
-ORDER BY FIELD(cs.status, 'open', 'closed') ASC, cs.session_id DESC
-LIMIT 100";
+ORDER BY FIELD(cs.status, 'open', 'closed') ASC, cs.session_id DESC";
+
+$params = [$branchId];
+$types  = 'i';
+
+if ($pagination['enabled']) {
+    $sessSql .= " LIMIT ? OFFSET ?";
+    $params[] = $pagination['limit'];
+    $params[] = $pagination['offset'];
+    $types .= 'ii';
+}
 
 $sStmt = $connect->prepare($sessSql);
-$sStmt->bind_param('i', $branchId);
+$sStmt->bind_param($types, ...$params);
 $sStmt->execute();
 $sRes = $sStmt->get_result();
 
@@ -70,6 +90,8 @@ while ($row = $sRes->fetch_assoc()) {
         'register_id'           => (int)$row['register_id'],
         'register_code'         => $row['register_code'] ?? '',
         'register_name'         => $row['register_name'] ?? 'Caja',
+        'bank_entity'           => $row['bank_entity'] ?: 'BCP',
+        'bank_entity_code'      => $row['bank_entity_code'] ?? null,
         'session_code'          => $row['session_code'],
         'opened_by'             => (int)$row['opened_by'],
         'opened_by_name'        => $row['opened_by_name'],
@@ -105,6 +127,8 @@ while ($row = $sRes->fetch_assoc()) {
 $sStmt->close();
 $connect->close();
 
+$meta = sb_build_pagination_meta($total, $pagination);
+
 json_response([
     'success'               => true,
     'activeBranch'          => $activeBranch,
@@ -120,5 +144,5 @@ json_response([
     'openSessions'      => $openSessions,
     'active_session'    => !empty($openSessions) ? $openSessions[0] : null,
     'sessions'          => $sessions,
+    'pagination'        => $meta,
 ]);
-

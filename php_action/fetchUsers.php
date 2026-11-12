@@ -10,6 +10,8 @@ $roleId = isset($_GET['role_id']) && $_GET['role_id'] !== '' ? (int)$_GET['role_
 $branchId = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
 $activeFilter = isset($_GET['active']) && $_GET['active'] !== '' ? (int)$_GET['active'] : null;
 
+$pagination = sb_get_pagination_params(25, 250);
+
 $whereClauses = ['1=1'];
 $params = [];
 $types = '';
@@ -44,6 +46,17 @@ if ($activeFilter !== null && in_array($activeFilter, [0, 1], true)) {
 
 $whereSql = implode(' AND ', $whereClauses);
 
+// Count total
+$countSql = "SELECT COUNT(*) as total FROM users u WHERE {$whereSql}";
+$cStmt = $connect->prepare($countSql);
+if (!empty($params)) {
+    $cStmt->bind_param($types, ...$params);
+}
+$cStmt->execute();
+$totalRow = $cStmt->get_result()->fetch_assoc();
+$total = (int)($totalRow['total'] ?? 0);
+$cStmt->close();
+
 $sql = "SELECT 
             u.user_id,
             u.username,
@@ -67,9 +80,19 @@ $sql = "SELECT
         WHERE {$whereSql}
         ORDER BY u.user_id ASC";
 
+$dataParams = $params;
+$dataTypes = $types;
+
+if ($pagination['enabled']) {
+    $sql .= " LIMIT ? OFFSET ?";
+    $dataParams[] = $pagination['limit'];
+    $dataParams[] = $pagination['offset'];
+    $dataTypes .= 'ii';
+}
+
 $stmt = $connect->prepare($sql);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
+if (!empty($dataParams)) {
+    $stmt->bind_param($dataTypes, ...$dataParams);
 }
 $stmt->execute();
 $res = $stmt->get_result();
@@ -121,9 +144,12 @@ $stats = [
 
 $connect->close();
 
+$meta = sb_build_pagination_meta($total, $pagination);
+
 json_response([
     'success' => true,
     'data' => $users,
+    'pagination' => $meta,
     'stats' => $stats,
 ]);
 

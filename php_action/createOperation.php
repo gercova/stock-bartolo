@@ -9,13 +9,28 @@ $data = get_request_data();
 $branchId = get_active_branch_id($connect);
 $userId = (int)($_SESSION['userId'] ?? 1);
 
+$sourceBankEntity = sanitize_clean_text($data['source_bank_entity'] ?? $data['sourceBankEntity'] ?? 'BCP', 'entidad de origen', 60, false);
+if ($sourceBankEntity === '') $sourceBankEntity = 'BCP';
+
+$destinationBankEntity = sanitize_clean_text($data['destination_bank_entity'] ?? $data['destinationBankEntity'] ?? 'BCP', 'entidad de destino', 60, false);
+if ($destinationBankEntity === '') $destinationBankEntity = 'BCP';
+
+$destinationAccount = sanitize_clean_text($data['destination_account'] ?? $data['destinationAccount'] ?? '', 'cuenta de destino', 60, false);
+
 // Enforce open cash register for all commercial operations across all branches
-$openSession = sb_get_open_cash_session($connect, $branchId);
+$openSession = sb_get_open_cash_session($connect, $branchId, $sourceBankEntity);
 if (!$openSession) {
+    $anySession = sb_get_open_cash_session($connect, $branchId);
     $activeBranch = get_active_branch($connect);
     $bName = $activeBranch['branch_name'] ?? 'esta sucursal';
-    send_http_error(400, "Para registrar depósitos o retiros en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
+    if (!$anySession) {
+        send_http_error(400, "Para registrar depósitos o retiros en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
+    } else {
+        send_http_error(400, "No se encontró una caja abierta para el fondo bancario '{$sourceBankEntity}' en {$bName}. Hay turno abierto en caja: {$anySession['register_name']} ({$anySession['bank_entity']}). Por favor, abre una caja asignada a {$sourceBankEntity} o selecciona una entidad con caja abierta.");
+    }
 }
+
+$sessionId = (int)$openSession['session_id'];
 
 $clientId = (int)($data['client_id'] ?? $data['clientId'] ?? 0);
 $opType = strtolower(trim((string)($data['operation_type'] ?? $data['operationType'] ?? '')));
@@ -107,9 +122,26 @@ try {
     $accountId = (int)$cashAcc['account_id'];
     $balanceBefore = (float)$cashAcc['current_balance'];
 
+    $cashToDispense = $commissionIncluded ? $netAmount : $amount;
+
+    // Lock the specific cash register session for the bank entity
+    $sessStmt = $connect->prepare("SELECT session_id, register_id, bank_entity, opening_amount, cash_in_total, cash_out_total, expected_cash FROM cash_sessions WHERE session_id = ? AND branch_id = ? AND status = 'open' LIMIT 1 FOR UPDATE");
+    $sessStmt->bind_param('ii', $sessionId, $branchId);
+    $sessStmt->execute();
+    $sessRow = $sessStmt->get_result()->fetch_assoc();
+    $sessStmt->close();
+
+    if (!$sessRow) {
+        throw new RuntimeException("La sesión de caja asignada a {$sourceBankEntity} ya no se encuentra abierta.");
+    }
+
+    $sessExpectedBefore = (float)$sessRow['expected_cash'];
+
     // Verify sufficient balance for withdrawal
     if ($opType === 'withdrawal') {
-        $cashToDispense = $commissionIncluded ? $netAmount : $amount;
+        if ($sessExpectedBefore < $cashToDispense) {
+            throw new RuntimeException("Saldo insuficiente en la caja asignada a {$sourceBankEntity}. Saldo en caja: S/ " . number_format($sessExpectedBefore, 2) . ", requerido para retiro: S/ " . number_format($cashToDispense, 2));
+        }
         if ($balanceBefore < $cashToDispense) {
             throw new RuntimeException("Saldo insuficiente en la Caja General de la sucursal. Saldo disponible: S/ " . number_format($balanceBefore, 2) . ", requerido para retiro: S/ " . number_format($cashToDispense, 2));
         }
@@ -126,6 +158,31 @@ try {
     $updAcc->execute();
     $updAcc->close();
 
+    // Adjust balance of the respective bank cash register session
+    $sessOpening = (float)$sessRow['opening_amount'];
+    $sessCashIn = (float)$sessRow['cash_in_total'];
+    $sessCashOut = (float)$sessRow['cash_out_total'];
+
+    if ($opType === 'deposit') {
+        $newSessCashIn = round($sessCashIn + $cashDrawerDelta, 2);
+        $newSessCashOut = $sessCashOut;
+        $sessMovType = 'operation_deposit';
+        $sessMovDir = 'in';
+        $sessMovAmount = $cashDrawerDelta;
+    } else {
+        $newSessCashIn = $sessCashIn;
+        $newSessCashOut = round($sessCashOut + abs($cashDrawerDelta), 2);
+        $sessMovType = 'operation_withdrawal';
+        $sessMovDir = 'out';
+        $sessMovAmount = abs($cashDrawerDelta);
+    }
+    $newSessExpected = round($sessOpening + $newSessCashIn - $newSessCashOut, 2);
+
+    $updSess = $connect->prepare('UPDATE cash_sessions SET cash_in_total = ?, cash_out_total = ?, expected_cash = ? WHERE session_id = ?');
+    $updSess->bind_param('dddi', $newSessCashIn, $newSessCashOut, $newSessExpected, $sessionId);
+    $updSess->execute();
+    $updSess->close();
+
     // Generate Operation Code
     $codeStmt = $connect->prepare('SELECT COUNT(*) as c FROM branch_operations WHERE branch_id = ?');
     $codeStmt->bind_param('i', $branchId);
@@ -140,19 +197,24 @@ try {
     // Insert into branch_operations
     $includedFlag = $commissionIncluded ? 1 : 0;
     $insOp = $connect->prepare('INSERT INTO branch_operations (
-        branch_id, operation_code, client_id, user_id, operation_type,
+        branch_id, session_id, operation_code, client_id, user_id, operation_type,
+        source_bank_entity, destination_bank_entity, destination_account,
         amount, commission_amount, commission_included, net_amount,
         total_customer_amount, points_earned, central_balance_before,
         central_balance_after, status, notes, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "completed", ?, NOW(), NOW())');
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "completed", ?, NOW(), NOW())');
 
     $insOp->bind_param(
-        'isisssdididdds',
+        'iisiissssddididdds',
         $branchId,
+        $sessionId,
         $opCode,
         $clientId,
         $userId,
         $opType,
+        $sourceBankEntity,
+        $destinationBankEntity,
+        $destinationAccount,
         $amount,
         $commissionAmount,
         $includedFlag,
@@ -171,10 +233,30 @@ try {
     $newOpId = (int)$insOp->insert_id;
     $insOp->close();
 
+    // Log movement in cash_movements (tied to bank register session)
+    $descSess = ($opType === 'deposit' ? 'Depósito de fondos' : 'Retiro de fondos') . " [{$sourceBankEntity} -> {$destinationBankEntity}] - Cliente: {$client['name']}";
+    $movSessStmt = $connect->prepare('INSERT INTO cash_movements (
+        branch_id, session_id, user_id, movement_type, direction,
+        amount, payment_method, reference_type, reference_id, description, record_status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 2, "operation", ?, ?, 1, NOW())');
+    $movSessStmt->bind_param(
+        'iiissdis',
+        $branchId,
+        $sessionId,
+        $userId,
+        $sessMovType,
+        $sessMovDir,
+        $sessMovAmount,
+        $newOpId,
+        $descSess
+    );
+    $movSessStmt->execute();
+    $movSessStmt->close();
+
     // Log movement in general_cash_movements
     $movDir = $cashDrawerDelta >= 0 ? 'in' : 'out';
     $movType = $opType === 'deposit' ? 'deposit_operation' : 'withdrawal_operation';
-    $movDesc = ($opType === 'deposit' ? 'Depósito de efectivo' : 'Retiro de efectivo') . " - Cliente: {$client['name']} ({$client['document_type']} {$client['document_number']})";
+    $movDesc = ($opType === 'deposit' ? 'Depósito de efectivo' : 'Retiro de efectivo') . " [{$sourceBankEntity}] - Cliente: {$client['name']} ({$client['document_type']} {$client['document_number']})";
     $absDelta = abs($cashDrawerDelta);
 
     $movStmt = $connect->prepare('INSERT INTO general_cash_movements (
@@ -258,6 +340,11 @@ try {
         'operation_code' => $opCode,
         'operation_type' => $opType,
         'operation_type_label' => $opType === 'deposit' ? 'DEPÓSITO' : 'RETIRO',
+        'source_bank_entity' => $sourceBankEntity,
+        'destination_bank_entity' => $destinationBankEntity,
+        'destination_account' => $destinationAccount,
+        'register_name' => $openSession['register_name'] ?? 'Caja',
+        'session_code' => $openSession['session_code'] ?? '',
         'amount' => $amount,
         'commission_amount' => $commissionAmount,
         'commission_included' => $commissionIncluded,
