@@ -448,6 +448,35 @@ CREATE TABLE IF NOT EXISTS `login_attempts` (
   KEY `idx_login_attempts_ip_updated` (`ip_address`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `clients` (
+  `client_id` int(11) NOT NULL AUTO_INCREMENT,
+  `branch_id` int(11) DEFAULT NULL,
+  `document_type` enum('DNI','RUC','CE','PASAPORTE','OTRO') NOT NULL DEFAULT 'DNI',
+  `document_number` varchar(20) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `first_name` varchar(100) DEFAULT NULL,
+  `last_name` varchar(100) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `province` varchar(100) DEFAULT NULL,
+  `district` varchar(100) DEFAULT NULL,
+  `ubigeo` varchar(10) DEFAULT NULL,
+  `client_type` enum('client','supplier','both') NOT NULL DEFAULT 'client',
+  `status` tinyint(1) NOT NULL DEFAULT 1,
+  `record_status` tinyint(1) NOT NULL DEFAULT 1,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`client_id`),
+  KEY `idx_clients_branch` (`branch_id`),
+  KEY `idx_clients_document` (`document_type`, `document_number`),
+  KEY `idx_clients_record_status` (`record_status`),
+  KEY `idx_clients_client_type` (`client_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

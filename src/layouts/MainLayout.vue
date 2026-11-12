@@ -267,6 +267,14 @@
                 Config. del Sistema
               </RouterLink>
               <RouterLink
+                to="/security"
+                class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                @click="userMenuOpen = false"
+              >
+                <ShieldCheck class="h-4 w-4 text-slate-400" />
+                Gestión de Seguridad
+              </RouterLink>
+              <RouterLink
                 to="/settings"
                 class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 @click="userMenuOpen = false"
@@ -328,6 +336,8 @@ import {
   Store,
   Building2,
   Check,
+  Users,
+  ShieldCheck,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -370,6 +380,7 @@ const navGroups = [
       { label: 'Agregar Orden', to: '/orders/create', icon: PlusCircle, match: ['/orders/create'] },
       { label: 'Caja', to: '/cash-register', icon: Calculator, match: ['/cash-register'], badge: 'Nuevo' },
       { label: 'Préstamos', to: '/loans', icon: HandCoins, match: ['/loans'] },
+      { label: 'Clientes y Prov.', to: '/clients', icon: Users, match: ['/clients'] },
       { label: 'Reportes', to: '/reports', icon: BarChart3, match: ['/reports'] },
     ],
   },
@@ -377,6 +388,7 @@ const navGroups = [
     label: 'Sistema',
     items: [
       { label: 'Config. del Sistema', to: '/system-config', icon: SlidersHorizontal, match: ['/system-config'] },
+      { label: 'Gestión de Seguridad', to: '/security', icon: ShieldCheck, match: ['/security'] },
       { label: 'Cuenta y Seguridad', to: '/settings', icon: Settings, match: ['/settings'] },
     ],
   },

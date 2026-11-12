@@ -3,12 +3,12 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST', 'PUT']);
 
-$data = get_request_data();
-$currentPassword = (string)($data['password'] ?? '');
-$newPassword = (string)($data['npassword'] ?? '');
-$confirmPassword = (string)($data['cpassword'] ?? '');
-$requestedUserId = (int)($data['user_id'] ?? $_SESSION['userId']);
-$sessionUserId = (int)$_SESSION['userId'];
+$data               = get_request_data();
+$currentPassword    = (string)($data['password'] ?? '');
+$newPassword        = (string)($data['npassword'] ?? '');
+$confirmPassword    = (string)($data['cpassword'] ?? '');
+$requestedUserId    = (int)($data['user_id'] ?? $_SESSION['userId']);
+$sessionUserId      = (int)$_SESSION['userId'];
 
 if ($requestedUserId !== $sessionUserId) {
     send_http_error(403, 'No tienes permisos para cambiar la contraseña de otro usuario.');

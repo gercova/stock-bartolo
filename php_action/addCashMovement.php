@@ -3,19 +3,19 @@
 require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
-$branchId = get_active_branch_id($connect);
-$userId = (int)$_SESSION['userId'];
-$data = get_request_data();
+$branchId   = get_active_branch_id($connect);
+$userId     = (int)$_SESSION['userId'];
+$data       = get_request_data();
 
-$sessionId = (int)($data['sessionId'] ?? 0);
-$movementType = sanitize_clean_text($data['movementType'] ?? '', 'tipo de movimiento', 40, true);
-$amount = round((float)($data['amount'] ?? 0), 2);
-$description = sanitize_clean_text($data['description'] ?? '', 'descripción', 255, true);
+$sessionId      = (int)($data['sessionId'] ?? 0);
+$movementType   = sanitize_clean_text($data['movementType'] ?? '', 'tipo de movimiento', 40, true);
+$amount         = round((float)($data['amount'] ?? 0), 2);
+$description    = sanitize_clean_text($data['description'] ?? '', 'descripción', 255, true);
 
-$allowedTypes = [
-    'manual_in' => 'in',
-    'manual_out' => 'out',
-    'expense' => 'out',
+$allowedTypes   = [
+    'manual_in'     => 'in',
+    'manual_out'    => 'out',
+    'expense'       => 'out',
     'sweep_to_general' => 'out',
 ];
 
@@ -46,9 +46,9 @@ try {
         throw new InvalidArgumentException('El efectivo esperado en gaveta ($' . number_format($expectedNow, 2) . ') es menor al retiro solicitado.');
     }
 
-    $paymentMethod = 2; // Cash
-    $refType = $movementType === 'sweep_to_general' ? 'general_cash' : 'manual';
-    $refId = null;
+    $paymentMethod  = 2; // Cash
+    $refType        = $movementType === 'sweep_to_general' ? 'general_cash' : 'manual';
+    $refId          = null;
 
     if ($movementType === 'sweep_to_general') {
         $accStmt = $connect->prepare('SELECT account_id, current_balance, status FROM general_cash_accounts WHERE branch_id = ? LIMIT 1 FOR UPDATE');
@@ -61,22 +61,22 @@ try {
             throw new InvalidArgumentException('La Caja General de esta sucursal está inactiva.');
         }
 
-        $accId = (int)$acc['account_id'];
-        $balBefore = round((float)$acc['current_balance'], 2);
-        $balAfter = round($balBefore + $amount, 2);
+        $accId      = (int)$acc['account_id'];
+        $balBefore  = round((float)$acc['current_balance'], 2);
+        $balAfter   = round($balBefore + $amount, 2);
 
-        $updAcc = $connect->prepare('UPDATE general_cash_accounts SET current_balance = ?, updated_by = ? WHERE account_id = ?');
+        $updAcc     = $connect->prepare('UPDATE general_cash_accounts SET current_balance = ?, updated_by = ? WHERE account_id = ?');
         $updAcc->bind_param('dii', $balAfter, $userId, $accId);
         $updAcc->execute();
         $updAcc->close();
 
         $gcType = 'till_close_return';
-        $gcDir = 'in';
+        $gcDir  = 'in';
         $gcDesc = "Retiro parcial desde caja {$sess['session_code']}: {$description}";
-        $gcMov = $connect->prepare('INSERT INTO general_cash_movements (branch_id, account_id, cash_session_id, user_id, movement_type, direction, amount, balance_before, balance_after, reference, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $gcMov  = $connect->prepare('INSERT INTO general_cash_movements (branch_id, account_id, cash_session_id, user_id, movement_type, direction, amount, balance_before, balance_after, reference, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $gcMov->bind_param('iiiissdddss', $branchId, $accId, $sessionId, $userId, $gcType, $gcDir, $amount, $balBefore, $balAfter, $sess['session_code'], $gcDesc);
         $gcMov->execute();
-        $refId = (int)$connect->insert_id;
+        $refId  = (int)$connect->insert_id;
         $gcMov->close();
     }
 
@@ -86,8 +86,8 @@ try {
     $movId = (int)$connect->insert_id;
     $insMov->close();
 
-    $cashIn = round((float)$sess['cash_in_total'] + ($direction === 'in' ? $amount : 0), 2);
-    $cashOut = round((float)$sess['cash_out_total'] + ($direction === 'out' ? $amount : 0), 2);
+    $cashIn     = round((float)$sess['cash_in_total'] + ($direction === 'in' ? $amount : 0), 2);
+    $cashOut    = round((float)$sess['cash_out_total'] + ($direction === 'out' ? $amount : 0), 2);
     $newExpected = round((float)$sess['opening_amount'] + $cashIn - $cashOut, 2);
 
     $updSess = $connect->prepare('UPDATE cash_sessions SET cash_in_total = ?, cash_out_total = ?, expected_cash = ? WHERE session_id = ?');
@@ -99,9 +99,9 @@ try {
     $connect->close();
 
     json_response([
-        'success' => true,
-        'messages' => 'Movimiento de caja registrado exitosamente',
-        'movement_id' => $movId,
+        'success'       => true,
+        'messages'      => 'Movimiento de caja registrado exitosamente',
+        'movement_id'   => $movId,
         'expected_cash' => $newExpected,
     ], 201);
 } catch (InvalidArgumentException $e) {

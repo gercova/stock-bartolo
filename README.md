@@ -1,6 +1,6 @@
-# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja y Préstamos
+# Stock Bartolo — Sistema Multi-Sucursal de Inventario, POS, Caja, Clientes y Seguridad
 
-Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, reportes y **gestión de préstamos a clientes con interés opcional**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** (`65` endpoints/módulos) y base de datos **MySQL / MariaDB** (`17` tablas) con endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
+Aplicación web moderna de **página única (SPA)** para la administración integral multi-sucursal (*multi-tenant*) de inventario, punto de venta (órdenes), **Caja General independiente por sucursal**, **control de Caja Registradora (apertura, movimientos, arqueo y cierre Corte Z)**, reportes, **gestión de préstamos a clientes con interés opcional**, **Padrón de Clientes y Proveedores con consulta en tiempo real RENIEC/SUNAT (Decolecta) y borrado lógico (*soft delete*)**, y **Gestión Integral de Seguridad con control de acceso basado en roles (RBAC), matriz de 15 módulos y registro inmutable de auditoría**. Construida sobre **Vue 3 + Pinia + Vue Router 5 + Tailwind CSS v4**, respaldada por una API REST JSON en **PHP 8** (`75` endpoints/módulos) y base de datos **MySQL / MariaDB** (`21` tablas) con variables de entorno protegidas vía `.env` y endurecimiento de seguridad contra XSS, CSRF, fuerza bruta, colisiones de concurrencia e inyección SQL.
 
 ---
 
@@ -59,13 +59,29 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
   - **Con interés**: Permite especificar tasa porcentual (`interestRate`), modalidad (**porcentaje único** `flat` o **mensual simple** `monthly`) y plazo en meses/cuotas (`termMonths`) con resumen financiero en vivo.
 - Asociación opcional a una orden activa de la misma sucursal, abono inicial opcional, historial de pagos (`loan_payments`), integración automática con `Caja`, comprobante imprimible en [LoanDetailModal.vue](src/components/loans/LoanDetailModal.vue) y detección automática de mora (`loan_status = 4`).
 
-### 5. Gestión de Inventario, Órdenes y Reportes
+### 5. Padrón de Clientes y Proveedores con Consulta RENIEC / SUNAT y Borrado Lógico (`/clients`)
+- **Gestión Unificada**: Módulo en [ClientsView.vue](src/views/ClientsView.vue), [ClientModal.vue](src/components/clients/ClientModal.vue) y [clients.js](src/stores/clients.js) para clasificar registros como **Cliente**, **Proveedor** o **Cliente y Proveedor**.
+- **Integración Automatizada con API Decolecta**:
+  - Consulta en tiempo real de **DNI (8 dígitos) ante RENIEC** para autocompletar nombres, apellidos y nombre completo.
+  - Consulta en tiempo real de **RUC (11 dígitos) ante SUNAT** para autocompletar razón social, dirección fiscal, departamento, provincia, distrito, ubigeo y verificar condición fiscal (**ACTIVO / HABIDO**).
+  - Manejador centralizado en `lookupDocument.php` con autenticación segura por *Bearer Token* configurado en el archivo `.env`.
+- **Borrado Lógico (*Soft Deletes*)**:
+  - Eliminación no destructiva mediante `record_status = 2` y `deleted_at = NOW()` (`removeClient.php`).
+  - Los registros borrados desaparecen inmediatamente de la interfaz y consultas activas, pero se preservan de forma inmutable en la base de datos para no quebrar la integridad referencial ni el historial financiero de ventas, préstamos y pagos.
+
+### 6. Gestión Integral de Seguridad, Roles RBAC y Auditoría (`/security`)
+- Módulo centralizado de 3 pestañas en [SecurityView.vue](src/views/SecurityView.vue) y [security.js](src/stores/security.js):
+  1. **Directorio de Usuarios (CRUD)**: Creación, edición, activación/desactivación y asignación de sucursal y rol de seguridad. Hash de contraseñas mediante `PASSWORD_DEFAULT`. Protegido contra auto-desactivación, auto-eliminación y degradación del último Superadministrador activo.
+  2. **Roles y Matriz de Permisos Granulares**: Perfiles predefinidos (`superadmin`, `admin`, `supervisor`, `cashier`, `seller`) y roles personalizados. Matriz interactiva de **4 privilegios independientes** (`access`, `create`, `update`, `delete`) para los **15 módulos del sistema** en [RoleModal.vue](src/components/security/RoleModal.vue).
+  3. **Registro de Auditoría Inmutable (*Audit Log*)**: Historial inmutable en `audit_logs` que registra quién, qué, cuándo, IP, User-Agent, módulo, acción y payload JSON formateado, con visor detallado en [AuditDetailModal.vue](src/components/security/AuditDetailModal.vue).
+
+### 7. Gestión de Inventario, Órdenes y Reportes
 - **Fabricantes (`/brands`)** y **Categorías (`/categories`)**: CRUD por sucursal con búsqueda, filtros y borrado lógico.
 - **Productos (`/products`)**: CRUD por sucursal con carga segura de imágenes (`editProductImage.php`) y alertas de stock bajo (`<= 3` unidades).
 - **Órdenes / POS (`/orders`, `/orders/create`, `/orders/:id/edit`)**: cálculo con tasa de IVA y símbolo de moneda de la sucursal activa, control transaccional de stock (`FOR UPDATE`), verificación de caja abierta cuando `enforce_open_till_for_cash` está activo y ticket imprimible con cabecera de sucursal.
 - **Reportes (`/reports`)**: Consolidado imprimible por rango de fechas dentro de la sucursal activa cruzando órdenes y préstamos.
 
-### 6. Páginas de Error HTTP (`400`–`504`) y SPA Pura
+### 8. Páginas de Error HTTP (`400`–`504`) y SPA Pura
 - Manejador centralizado en SPA ([ErrorView.vue](src/views/ErrorView.vue), [httpErrors.js](src/constants/httpErrors.js)) y Apache ([http_error.php](php_action/http_error.php), [error.php](php_action/error.php), [.htaccess](.htaccess)) cubriendo **`400`, `401`, `403`, `404`, `405`, `408`, `422`, `429`, `500`, `501`, `502`, `503`, `504`**.
 
 ---
@@ -82,7 +98,7 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
 | **Iconografía** | `@lucide/vue` | `^1.0.0` |
 | **Bundler** | Vite + `@vitejs/plugin-vue` | `^8.3.7` / `^6.0.10` |
 | **Backend API** | PHP (API JSON + Sesiones + `mysqli`) | PHP 8.1+ (probado en 8.3) |
-| **Base de Datos** | MySQL / MariaDB (`utf8mb4` en tablas nuevas/tenant) | 5.7+ / MariaDB 10.4+ (probado en 10.11.14) |
+| **Base de Datos** | MySQL / MariaDB (`utf8mb4` en tablas nuevas/tenant) | 5.7+ / MariaDB 10.4+ (probado en 10.11.14) — **21 Tablas** |
 | **Servidor Web** | Apache (`mod_rewrite`, `mod_headers`) o PHP embebido | `.htaccess` incluido |
 
 ---

@@ -442,31 +442,31 @@ function ensure_app_schema(mysqli $connect): void
         $rolePermPresets = [
             1 => [ // superadmin: all 1
                 'dashboard' => [1,1,1,1], 'brands' => [1,1,1,1], 'categories' => [1,1,1,1], 'products' => [1,1,1,1],
-                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'reports' => [1,1,1,1],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'clients' => [1,1,1,1], 'reports' => [1,1,1,1],
                 'general_cash' => [1,1,1,1], 'branches' => [1,1,1,1], 'system_config' => [1,1,1,1],
                 'users' => [1,1,1,1], 'roles' => [1,1,1,1], 'audit_logs' => [1,1,1,1]
             ],
             2 => [ // admin
                 'dashboard' => [1,0,0,0], 'brands' => [1,1,1,1], 'categories' => [1,1,1,1], 'products' => [1,1,1,1],
-                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'reports' => [1,0,0,0],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,1], 'loans' => [1,1,1,1], 'clients' => [1,1,1,1], 'reports' => [1,0,0,0],
                 'general_cash' => [1,1,1,1], 'branches' => [1,1,1,0], 'system_config' => [1,0,1,0],
                 'users' => [1,1,1,1], 'roles' => [1,1,1,0], 'audit_logs' => [1,0,0,0]
             ],
             3 => [ // supervisor
                 'dashboard' => [1,0,0,0], 'brands' => [1,1,1,0], 'categories' => [1,1,1,0], 'products' => [1,1,1,0],
-                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,0], 'loans' => [1,1,1,0], 'reports' => [1,0,0,0],
+                'orders' => [1,1,1,1], 'cash_register' => [1,1,1,0], 'loans' => [1,1,1,0], 'clients' => [1,1,1,0], 'reports' => [1,0,0,0],
                 'general_cash' => [1,0,0,0], 'branches' => [1,0,0,0], 'system_config' => [0,0,0,0],
                 'users' => [1,0,0,0], 'roles' => [1,0,0,0], 'audit_logs' => [1,0,0,0]
             ],
             4 => [ // cashier
                 'dashboard' => [1,0,0,0], 'brands' => [1,0,0,0], 'categories' => [1,0,0,0], 'products' => [1,0,0,0],
-                'orders' => [1,1,1,0], 'cash_register' => [1,1,1,0], 'loans' => [1,0,1,0], 'reports' => [0,0,0,0],
+                'orders' => [1,1,1,0], 'cash_register' => [1,1,1,0], 'loans' => [1,0,1,0], 'clients' => [1,1,1,0], 'reports' => [0,0,0,0],
                 'general_cash' => [0,0,0,0], 'branches' => [0,0,0,0], 'system_config' => [0,0,0,0],
                 'users' => [0,0,0,0], 'roles' => [0,0,0,0], 'audit_logs' => [0,0,0,0]
             ],
             5 => [ // seller
                 'dashboard' => [1,0,0,0], 'brands' => [1,0,0,0], 'categories' => [1,0,0,0], 'products' => [1,0,0,0],
-                'orders' => [1,1,0,0], 'cash_register' => [0,0,0,0], 'loans' => [1,0,0,0], 'reports' => [0,0,0,0],
+                'orders' => [1,1,0,0], 'cash_register' => [0,0,0,0], 'loans' => [1,0,0,0], 'clients' => [1,1,0,0], 'reports' => [0,0,0,0],
                 'general_cash' => [0,0,0,0], 'branches' => [0,0,0,0], 'system_config' => [0,0,0,0],
                 'users' => [0,0,0,0], 'roles' => [0,0,0,0], 'audit_logs' => [0,0,0,0]
             ],
@@ -488,6 +488,63 @@ function ensure_app_schema(mysqli $connect): void
 
     // 9. Attach admin user to role #1 and set full_name
     $connect->query("UPDATE `users` SET `role_id` = 1, `full_name` = 'Administrador Principal' WHERE `user_id` = 1 AND (`role_id` IS NULL OR `role_id` = 0 OR `full_name` = '' OR `full_name` IS NULL)");
+
+    // 10. Clients & Suppliers Table with Soft Deletes (record_status = 1 active, 2 deleted)
+    $connect->query("CREATE TABLE IF NOT EXISTS `clients` (
+      `client_id` int(11) NOT NULL AUTO_INCREMENT,
+      `branch_id` int(11) DEFAULT NULL,
+      `document_type` enum('DNI','RUC','CE','PASAPORTE','OTRO') NOT NULL DEFAULT 'DNI',
+      `document_number` varchar(20) NOT NULL,
+      `name` varchar(255) NOT NULL,
+      `first_name` varchar(100) DEFAULT NULL,
+      `last_name` varchar(100) DEFAULT NULL,
+      `email` varchar(150) DEFAULT NULL,
+      `phone` varchar(50) DEFAULT NULL,
+      `address` varchar(255) DEFAULT NULL,
+      `department` varchar(100) DEFAULT NULL,
+      `province` varchar(100) DEFAULT NULL,
+      `district` varchar(100) DEFAULT NULL,
+      `ubigeo` varchar(10) DEFAULT NULL,
+      `client_type` enum('client','supplier','both') NOT NULL DEFAULT 'client',
+      `status` tinyint(1) NOT NULL DEFAULT 1,
+      `record_status` tinyint(1) NOT NULL DEFAULT 1,
+      `notes` text DEFAULT NULL,
+      `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      `deleted_at` datetime DEFAULT NULL,
+      PRIMARY KEY (`client_id`),
+      KEY `idx_clients_branch` (`branch_id`),
+      KEY `idx_clients_document` (`document_type`, `document_number`),
+      KEY `idx_clients_record_status` (`record_status`),
+      KEY `idx_clients_client_type` (`client_type`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // Sync 'clients' permissions for existing roles if not present
+    $clientPermsSync = [
+        1 => [1, 1, 1, 1], // superadmin
+        2 => [1, 1, 1, 1], // admin
+        3 => [1, 1, 1, 0], // supervisor
+        4 => [1, 1, 1, 0], // cashier
+        5 => [1, 1, 0, 0], // seller
+    ];
+    foreach ($clientPermsSync as $rId => $p) {
+        $chkP = $connect->prepare("SELECT permission_id FROM `role_permissions` WHERE `role_id` = ? AND `module` = 'clients' LIMIT 1");
+        if ($chkP) {
+            $chkP->bind_param('i', $rId);
+            $chkP->execute();
+            if (!$chkP->get_result()->fetch_assoc()) {
+                $chkP->close();
+                $insP = $connect->prepare("INSERT INTO `role_permissions` (`role_id`, `module`, `can_access`, `can_create`, `can_update`, `can_delete`) VALUES (?, 'clients', ?, ?, ?, ?)");
+                if ($insP) {
+                    $insP->bind_param('iiiii', $rId, $p[0], $p[1], $p[2], $p[3]);
+                    $insP->execute();
+                    $insP->close();
+                }
+            } else {
+                $chkP->close();
+            }
+        }
+    }
 }
 
 function ensure_loan_schema(mysqli $connect): void

@@ -17,6 +17,8 @@ import ReportsView from '@/views/ReportsView.vue'
 import CashRegisterView from '@/views/CashRegisterView.vue'
 import SystemConfigView from '@/views/SystemConfigView.vue'
 import SettingsView from '@/views/SettingsView.vue'
+import ClientsView from '@/views/ClientsView.vue'
+import SecurityView from '@/views/SecurityView.vue'
 import ErrorView from '@/views/ErrorView.vue'
 
 const errorAliasRoutes = RELEVANT_ERROR_CODES.map((code) => ({
@@ -96,6 +98,12 @@ const routes = [
         meta: { title: 'Préstamos', breadcrumb: ['Inicio', 'Préstamos'] },
       },
       {
+        path: 'clients',
+        name: 'clients',
+        component: ClientsView,
+        meta: { title: 'Clientes y Proveedores', breadcrumb: ['Inicio', 'Ventas y Finanzas', 'Clientes y Proveedores'] },
+      },
+      {
         path: 'reports',
         name: 'reports',
         component: ReportsView,
@@ -114,6 +122,15 @@ const routes = [
         meta: {
           title: 'Configuración del Sistema',
           breadcrumb: ['Inicio', 'Sistema', 'Configuración del Sistema'],
+        },
+      },
+      {
+        path: 'security',
+        name: 'security',
+        component: SecurityView,
+        meta: {
+          title: 'Gestión de Seguridad',
+          breadcrumb: ['Inicio', 'Sistema', 'Gestión de Seguridad'],
         },
       },
       {

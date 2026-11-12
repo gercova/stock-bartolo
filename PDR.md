@@ -24,6 +24,9 @@ Este documento presenta la arquitectura técnica, el modelo relacional multi-suc
 | **OBJ-8** | Módulo **Configuración del Sistema** y **Caja General** multi-sucursal con CRUD completo | Completado | [SystemConfigView.vue](src/views/SystemConfigView.vue), [systemConfig.js](src/stores/systemConfig.js), `php_action/fetchSystemConfig.php`, `saveSystemConfig.php`, `fetchGeneralCash.php`, `manageGeneralCash.php` |
 | **OBJ-9** | Arquitectura **Multi-Sucursal (Multi-Tenant)** con aislamiento estricto por `branch_id` y CRUD | Completado | [tenant.php](php_action/tenant.php), `php_action/*Branch*.php`, `ensure_schema.php`, selector global en [MainLayout.vue](src/layouts/MainLayout.vue) |
 | **OBJ-10** | Módulo **Caja / Control de Caja** (Cajas CRUD, Apertura, Movimientos, Arqueo, Cierre Corte Z e integración POS/Préstamos) | Completado | [CashRegisterView.vue](src/views/CashRegisterView.vue), [cashRegister.js](src/stores/cashRegister.js), `src/components/cash/*`, `php_action/*Cash*.php` |
+| **OBJ-11** | Módulo **Gestión de Seguridad** (Usuarios CRUD, Roles CRUD, Matriz de Permisos RBAC de 15 módulos y Registro de Auditoría inmutable) | Completado | [SecurityView.vue](src/views/SecurityView.vue), [security.js](src/stores/security.js), `src/components/security/*`, `php_action/*User*.php`, `*Role*.php`, `fetchAuditLogs.php` |
+| **OBJ-12** | Módulo **Clientes y Proveedores** (CRUD, Integración Decolecta RENIEC/SUNAT y Borrado Lógico *Soft Deletes*) | Completado | [ClientsView.vue](src/views/ClientsView.vue), [ClientModal.vue](src/components/clients/ClientModal.vue), [clients.js](src/stores/clients.js), `php_action/*Client*.php`, `lookupDocument.php` |
+| **OBJ-13** | Conexión de Base de Datos e Integraciones Seguras vía `.env` sin credenciales expuestas | Completado | [.env](.env), [.env.example](.env.example), [env.php](php_action/env.php), [db_connect.php](php_action/db_connect.php) |
 
 ---
 
@@ -39,7 +42,7 @@ flowchart LR
     GW -->|"/assests/images/*"| IMG["Repositorio Estatico Imagenes (PHP bloqueado)"]
     SEC --> API["Endpoints API PHP 8 (65 archivos, Prepared Statements + FOR UPDATE)"]
     SEC --> ERR["http_error.php (400-504 JSON o HTML)"]
-    API --> DB[("MySQL / MariaDB pos_stock (17 Tablas Multi-Tenant)")]
+    API --> DB[("MySQL / MariaDB pos_stock (21 Tablas Multi-Tenant & Seguridad)")]
 ```
 
 ### 2.2 Flujo de Capital Operativo: Caja General ↔ Caja Registradora (Por Sucursal)

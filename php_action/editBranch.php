@@ -9,18 +9,18 @@ if (!sb_user_can_switch_branches($connect, $userId)) {
     send_http_error(403, 'No tienes permisos para editar sucursales.');
 }
 
-$data = get_request_data();
-$branchId = (int)($data['branchId'] ?? 0);
+$data       = get_request_data();
+$branchId   = (int)($data['branchId'] ?? 0);
 $branchName = sanitize_clean_text($data['branchName'] ?? '', 'nombre de la sucursal', 150, true);
-$rawCode = sanitize_clean_text($data['branchCode'] ?? '', 'código de sucursal', 32, true);
-$address = sanitize_clean_text($data['address'] ?? '', 'dirección', 255, false);
-$phone = sanitize_clean_text($data['phone'] ?? '', 'teléfono', 60, false);
-$email = sanitize_clean_text($data['email'] ?? '', 'correo electrónico', 120, false);
-$managerName = sanitize_clean_text($data['managerName'] ?? '', 'responsable', 120, false);
-$taxRate = round((float)($data['taxRate'] ?? 13.00), 2);
-$currencyCode = strtoupper(sanitize_clean_text($data['currencyCode'] ?? 'USD', 'código de moneda', 10, true));
+$rawCode    = sanitize_clean_text($data['branchCode'] ?? '', 'código de sucursal', 32, true);
+$address    = sanitize_clean_text($data['address'] ?? '', 'dirección', 255, false);
+$phone      = sanitize_clean_text($data['phone'] ?? '', 'teléfono', 60, false);
+$email      = sanitize_clean_text($data['email'] ?? '', 'correo electrónico', 120, false);
+$managerName    = sanitize_clean_text($data['managerName'] ?? '', 'responsable', 120, false);
+$taxRate        = round((float)($data['taxRate'] ?? 13.00), 2);
+$currencyCode   = strtoupper(sanitize_clean_text($data['currencyCode'] ?? 'USD', 'código de moneda', 10, true));
 $currencySymbol = sanitize_clean_text($data['currencySymbol'] ?? '$', 'símbolo de moneda', 8, true);
-$active = (int)($data['active'] ?? 1);
+$active         = (int)($data['active'] ?? 1);
 
 if ($branchId <= 0 || !in_array($active, [1, 2], true)) {
     send_http_error(400, 'Datos inválidos para actualizar la sucursal.');
@@ -87,14 +87,14 @@ if (!$stmt->execute()) {
 }
 $stmt->close();
 
-$activeBranch = get_active_branch($connect);
-$accessible = sb_get_accessible_branches($connect);
+$activeBranch   = get_active_branch($connect);
+$accessible     = sb_get_accessible_branches($connect);
 $connect->close();
 
 json_response([
-    'success' => true,
-    'messages' => 'Sucursal actualizada exitosamente',
-    'activeBranch' => $activeBranch,
-    'branches' => $accessible,
+    'success'       => true,
+    'messages'      => 'Sucursal actualizada exitosamente',
+    'activeBranch'  => $activeBranch,
+    'branches'      => $accessible,
 ]);
 

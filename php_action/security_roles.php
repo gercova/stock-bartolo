@@ -48,6 +48,12 @@ function sb_get_security_modules(): array
             'description' => 'Emisión de préstamos con/sin interés, control de cuotas y abonos a capital.',
         ],
         [
+            'key' => 'clients',
+            'name' => 'Clientes y Proveedores',
+            'category' => 'Ventas y Finanzas',
+            'description' => 'Administración de cartera de clientes, proveedores, consulta RENIEC/SUNAT y soft deletes.',
+        ],
+        [
             'key' => 'reports',
             'name' => 'Reportes',
             'category' => 'Ventas y Finanzas',
