@@ -107,15 +107,15 @@ $monthlyData = [];
 for ($m = 1; $m <= 12; $m++) {
     $row = $dbMonthly[$m] ?? null;
     $monthlyData[] = [
-        'month' => $m,
-        'month_name' => $monthNames[$m],
-        'deposit_amount' => (float)($row['deposit_amount'] ?? 0.0),
+        'month'             => $m,
+        'month_name'        => $monthNames[$m],
+        'deposit_amount'    => (float)($row['deposit_amount'] ?? 0.0),
         'withdrawal_amount' => (float)($row['withdrawal_amount'] ?? 0.0),
         'commission_amount' => (float)($row['commission_amount'] ?? 0.0),
-        'total_volume' => (float)($row['total_volume'] ?? 0.0),
-        'total_ops' => (int)($row['total_ops'] ?? 0),
-        'deposit_count' => (int)($row['deposit_count'] ?? 0),
-        'withdrawal_count' => (int)($row['withdrawal_count'] ?? 0),
+        'total_volume'      => (float)($row['total_volume'] ?? 0.0),
+        'total_ops'         => (int)($row['total_ops'] ?? 0),
+        'deposit_count'     => (int)($row['deposit_count'] ?? 0),
+        'withdrawal_count'  => (int)($row['withdrawal_count'] ?? 0),
     ];
 }
 

@@ -23,7 +23,7 @@ if (!$order) {
     send_http_error(404, 'Orden no encontrada en la sucursal activa.');
 }
 
-$itemStmt   = $connect->prepare('SELECT oi.order_item_id, oi.order_id, oi.product_id, oi.quantity, oi.rate, oi.total, p.product_name, p.quantity AS available_stock FROM order_item oi LEFT JOIN product p ON oi.product_id = p.product_id WHERE oi.order_id = ? AND oi.order_item_status = 1');
+$itemStmt   = $connect->prepare('SELECT oi.order_item_id, oi.order_id, oi.product_id, oi.item_name, oi.quantity, oi.rate, oi.total, COALESCE(NULLIF(oi.item_name, ""), p.product_name, "Ítem personalizado") AS product_name, p.quantity AS available_stock FROM order_item oi LEFT JOIN product p ON oi.product_id = p.product_id WHERE oi.order_id = ? AND oi.order_item_status = 1');
 $itemStmt->bind_param('i', $orderId);
 $itemStmt->execute();
 $itemRes    = $itemStmt->get_result();
@@ -32,6 +32,8 @@ while ($row = $itemRes->fetch_assoc()) {
     $items[] = [
         'order_item_id' => (int)$row['order_item_id'],
         'product_id'    => (int)$row['product_id'],
+        'item_name'     => $row['item_name'] ?? '',
+        'is_custom'     => (int)$row['product_id'] === 0,
         'product_name'  => $row['product_name'] ?? 'Producto',
         'quantity'      => (int)$row['quantity'],
         'rate'          => (float)$row['rate'],

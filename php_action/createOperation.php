@@ -8,6 +8,13 @@ sb_assert_permission($connect, 'operations', 'create');
 $data = get_request_data();
 $branchId = get_active_branch_id($connect);
 $userId = (int)($_SESSION['userId'] ?? 1);
+
+// Enforce open cash register for all commercial operations across all branches
+$openSession = sb_get_open_cash_session($connect, $branchId);
+if (!$openSession) {
+    send_http_error(400, 'Para registrar depósitos o retiros comerciales, la caja registradora de la sucursal debe estar abierta. Por favor, abre un turno de caja antes de continuar.');
+}
+
 $clientId = (int)($data['client_id'] ?? $data['clientId'] ?? 0);
 $opType = strtolower(trim((string)($data['operation_type'] ?? $data['operationType'] ?? '')));
 $amount = round(max(0.0, (float)($data['amount'] ?? 0.0)), 2);

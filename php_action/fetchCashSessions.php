@@ -118,6 +118,7 @@ json_response([
     ] : null,
     'registers' => $registers,
     'openSessions' => $openSessions,
+    'active_session' => !empty($openSessions) ? $openSessions[0] : null,
     'sessions' => $sessions,
 ]);
 

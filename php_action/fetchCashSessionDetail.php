@@ -3,10 +3,10 @@
 require_once __DIR__ . '/core.php';
 require_method(['GET', 'POST']);
 
-$branchId = get_active_branch_id($connect);
-$activeBranch = get_active_branch($connect);
-$data = array_merge($_GET, get_request_data());
-$sessionId = (int)($data['sessionId'] ?? $data['id'] ?? 0);
+$branchId       = get_active_branch_id($connect);
+$activeBranch   = get_active_branch($connect);
+$data           = array_merge($_GET, get_request_data());
+$sessionId      = (int)($data['sessionId'] ?? $data['id'] ?? 0);
 
 if ($sessionId <= 0) {
     send_http_error(400, 'ID de sesión de caja inválido.');
@@ -43,36 +43,36 @@ $mRes = $mStmt->get_result();
 
 $movements = [];
 $breakdown = [
-    'sale_cash' => 0.0,
-    'order_payment_cash' => 0.0,
-    'loan_payment_cash' => 0.0,
-    'manual_in' => 0.0,
-    'loan_disbursement' => 0.0,
-    'manual_out' => 0.0,
-    'expense' => 0.0,
-    'sweep_to_general' => 0.0,
+    'sale_cash'             => 0.0,
+    'order_payment_cash'    => 0.0,
+    'loan_payment_cash'     => 0.0,
+    'manual_in'             => 0.0,
+    'loan_disbursement'     => 0.0,
+    'manual_out'            => 0.0,
+    'expense'               => 0.0,
+    'sweep_to_general'      => 0.0,
 ];
 
 while ($m = $mRes->fetch_assoc()) {
-    $amt = round((float)$m['amount'], 2);
-    $type = $m['movement_type'];
+    $amt    = round((float)$m['amount'], 2);
+    $type   = $m['movement_type'];
     if (isset($breakdown[$type])) {
         $breakdown[$type] = round($breakdown[$type] + $amt, 2);
     }
 
     $movements[] = [
-        'movement_id' => (int)$m['movement_id'],
-        'session_id' => (int)$m['session_id'],
-        'user_id' => (int)$m['user_id'],
-        'username' => $m['username'],
+        'movement_id'   => (int)$m['movement_id'],
+        'session_id'    => (int)$m['session_id'],
+        'user_id'       => (int)$m['user_id'],
+        'username'      => $m['username'],
         'movement_type' => $type,
-        'direction' => $m['direction'],
-        'amount' => $amt,
+        'direction'     => $m['direction'],
+        'amount'        => $amt,
         'payment_method' => (int)$m['payment_method'],
         'reference_type' => $m['reference_type'] ?? '',
-        'reference_id' => $m['reference_id'] !== null ? (int)$m['reference_id'] : null,
-        'description' => $m['description'],
-        'created_at' => $m['created_at'],
+        'reference_id'  => $m['reference_id'] !== null ? (int)$m['reference_id'] : null,
+        'description'   => $m['description'],
+        'created_at'    => $m['created_at'],
     ];
 }
 $mStmt->close();

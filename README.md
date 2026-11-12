@@ -108,13 +108,35 @@ Aplicación web moderna de **página única (SPA)** para la administración inte
   - **Gráfico de Barras Horizontales - Clientes Más Frecuentes**: Ranking de clientes con mayor número de operaciones, discriminando depósitos y retiros.
   - **Tabla Clasificatoria (Leaderboard)**: Tabla interactiva con pestañas para ordenar por *"Mayor Volumen (S/)"*, *"Más Frecuentes"* y *"Mayor Puntuación"*.
 
-### 9. Gestión de Inventario, Órdenes y Reportes
+### 9. Mejoras del POS (`/orders/create`), Sidebar Acordeón y Comprobantes Multiformato
+- **Sidebar Rediseñado Estilo Acordeón (AdminLTE)** en [MainLayout.vue](src/layouts/MainLayout.vue):
+  - Organización jerárquica en **7 módulos temáticos**: *Inicio & Analítica*, *Ventas & Facturación*, *Inventario & Almacén*, *Caja & Operaciones*, *Créditos & Préstamos*, *Directorio & Clientes*, y *Sistema & Seguridad*.
+  - Menús desplegables con chevrons rotativos (180º), indentación de subelementos, persistencia de estado reactivo y auto-apertura del módulo al navegar a cualquiera de sus rutas.
+- **Apertura de Caja Registradora Obligatoria para Actividades Comerciales**:
+  - En cumplimiento de las políticas financieras, **la caja registradora de la sucursal activa debe estar abierta** para procesar órdenes de venta (`createOrder.php`, `editOrder.php`), operaciones de bóveda (`createOperation.php`), emisión de préstamos (`createLoan.php`) y recepción de pagos de préstamos (`addLoanPayment.php`).
+  - Si la caja está cerrada, el POS muestra un aviso destacado en rojo y bloquea el botón de envío; al abrir el turno, se habilita inmediatamente indicando el código de sesión activa (ej. `Caja Abierta: TURN-0001`).
+- **Búsqueda Dual de Clientes en el POS**:
+  - Consulta en tiempo real en la base de datos local y detección de DNI (8 dígitos) o RUC (11 dígitos) para invocar la API de **RENIEC / SUNAT (Decolecta)** con autollenado automático de nombre y contacto.
+- **Buscador de Productos Inteligente tipo Select2 (Zero NPM Dependencies)**:
+  - Componente [CustomSelect2Product.vue](src/components/common/CustomSelect2Product.vue) construido desde cero con Vue 3 y Tailwind CSS (sin dependencias externas de Node/NPM).
+  - Búsqueda en vivo con *debounce* (220ms), navegación fluida con teclado (`Flecha Abajo`, `Flecha Arriba`, `Enter`, `Escape`), stock en tiempo real y **límite estricto de máximo 5 resultados** en backend (`searchProducts.php`) y frontend para evitar sobrecargas al servidor y la base de datos.
+- **Ítem Libre / Servicio de Texto Personalizado**:
+  - Botón `"Añadir Ítem Libre / Servicio"` que inserta una fila editable en la tabla del POS con campo de descripción abierta, precio unitario manual y cantidad.
+  - Se almacena de forma persistente en `order_item.item_name` con `product_id = 0`, calculando IVA/IGV e importes contables sin alterar el stock de productos del catálogo.
+- **Emisión e Impresión de Comprobantes Multiformato**:
+  - Modal integrado [OrderReceiptModal.vue](src/components/orders/OrderReceiptModal.vue) conmutador dinámico de 3 formatos estándar:
+    1. **Ticket Térmico (80mm)**: formato estándar para impresoras de punto de venta con opción de **doble copia** (Cliente + Control Interno/Caja con línea de corte).
+    2. **A5 (Media Página)**: diseño apaisado institucional ideal para notas de venta y pedidos formales.
+    3. **A4 (Hoja Completa)**: documento corporativo completo con encabezado de sucursal, tabla de ítems, términos, firmas autorizadas y resumen tributario.
+  - Acceso inmediato tras completar la venta o desde el listado de órdenes (`/orders`) mediante el botón de impresión.
+
+### 10. Gestión de Inventario, Órdenes y Reportes
 - **Fabricantes (`/brands`)** y **Categorías (`/categories`)**: CRUD por sucursal con búsqueda, filtros y borrado lógico.
 - **Productos (`/products`)**: CRUD por sucursal con carga segura de imágenes (`editProductImage.php`) y alertas de stock bajo (`<= 3` unidades).
 - **Órdenes / POS (`/orders`, `/orders/create`, `/orders/:id/edit`)**: cálculo con tasa de IVA y símbolo de moneda de la sucursal activa, control transaccional de stock (`FOR UPDATE`), verificación de caja abierta cuando `enforce_open_till_for_cash` está activo y ticket imprimible con cabecera de sucursal.
 - **Reportes (`/reports`)**: Consolidado imprimible por rango de fechas dentro de la sucursal activa cruzando órdenes y préstamos.
 
-### 10. Páginas de Error HTTP (`400`–`504`) y SPA Pura
+### 11. Páginas de Error HTTP (`400`–`504`) y SPA Pura
 - Manejador centralizado en SPA ([ErrorView.vue](src/views/ErrorView.vue), [httpErrors.js](src/constants/httpErrors.js)) y Apache ([http_error.php](php_action/http_error.php), [error.php](php_action/error.php), [.htaccess](.htaccess)) cubriendo **`400`, `401`, `403`, `404`, `405`, `408`, `422`, `429`, `500`, `501`, `502`, `503`, `504`**.
 
 ---
@@ -326,8 +348,8 @@ Todas las rutas mutantes (`POST`, `PUT`, `DELETE`) exigen sesión autenticada (s
 | | `/php_action/printOperationReceipt.php` | `GET` | Payload completo para impresión de ticket térmico simple/doble |
 | **Fabricantes** | `/php_action/*Brand*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchBrand`, `fetchSelectedBrand`, `createBrand`, `editBrand`, `removeBrand` (por sucursal) |
 | **Categorías** | `/php_action/*Categories*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchCategories`, `fetchSelectedCategories`, `createCategories`, `editCategories`, `removeCategories` (por sucursal) |
-| **Productos** | `/php_action/*Product*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchProduct`, `fetchProductData`, `fetchSelectedProduct`, `fetchProductImageUrl`, `createProduct`, `editProduct`, `editProductImage`, `removeProduct` (por sucursal) |
-| **Órdenes / POS** | `/php_action/*Order*.php`, `editPayment.php`, `printOrder.php` | `GET`/`POST`/`PUT`/`DELETE` | Gestión transaccional de ventas, stock e impacto automático en Caja abierta |
+| **Productos** | `/php_action/*Product*.php`, `searchProducts.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchProduct`, `searchProducts` (búsqueda rápida Select2 máx. 5 ítems), `createProduct`, `editProduct`, `editProductImage`, `removeProduct` (por sucursal) |
+| **Órdenes / POS** | `/php_action/*Order*.php`, `editPayment.php`, `printOrder.php` | `GET`/`POST`/`PUT`/`DELETE` | Gestión transaccional de ventas, ítems personalizados (`order_item.item_name`), comprobantes multiformato (Ticket, A5, A4) y verificación de Caja abierta obligatoria |
 | **Préstamos** | `/php_action/*Loan*.php` | `GET`/`POST`/`PUT`/`DELETE` | `fetchLoan`, `fetchLoanData`, `createLoan`, `editLoan`, `addLoanPayment`, `removeLoan` + impacto en Caja abierta |
 | **Reportes / Cuenta** | `getOrderReport.php`, `changeUsername.php`, `changePassword.php`, `error.php` | `GET`/`POST`/`PUT` | Reportes multi-sucursal, gestión de credenciales y respuestas HTTP |
 

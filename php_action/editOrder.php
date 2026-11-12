@@ -18,6 +18,12 @@ $paymentType = (int)($data['paymentType'] ?? 0);
 $paymentStatus = (int)($data['paymentStatus'] ?? 0);
 $items = $data['items'] ?? [];
 
+// Enforce open cash register for all commercial/business operations across all branches
+$openSession = sb_get_open_cash_session($connect, $branchId);
+if (!$openSession) {
+    send_http_error(400, 'Para modificar órdenes u operaciones comerciales, la caja registradora de la sucursal debe estar abierta. Por favor, abre un turno de caja antes de continuar.');
+}
+
 if ($orderId <= 0 || $discount < 0 || $paid < 0 || !in_array($paymentType, [1, 2, 3], true) || !in_array($paymentStatus, [1, 2, 3], true) || !is_array($items) || count($items) === 0) {
     send_http_error(400, 'Completa todos los campos obligatorios de la orden con valores válidos.');
 }
@@ -51,8 +57,10 @@ try {
     while ($oldItem = $oldRes->fetch_assoc()) {
         $oldQty = (int)$oldItem['quantity'];
         $oldProdId = (int)$oldItem['product_id'];
-        $restoreStmt->bind_param('iii', $oldQty, $oldProdId, $branchId);
-        $restoreStmt->execute();
+        if ($oldProdId > 0 && $oldQty > 0) {
+            $restoreStmt->bind_param('iii', $oldQty, $oldProdId, $branchId);
+            $restoreStmt->execute();
+        }
     }
     $oldStmt->close();
     $restoreStmt->close();
@@ -75,38 +83,59 @@ try {
         }
         $productId = (int)($item['productId'] ?? $item['product_id'] ?? 0);
         $qty = (int)($item['quantity'] ?? 0);
-        if ($productId <= 0 || $qty <= 0) {
+        $isCustom = !empty($item['isCustom']) || !empty($item['is_custom']) || $productId === 0;
+
+        if ($qty <= 0) {
             throw new InvalidArgumentException('Cada producto debe tener una cantidad mayor a 0.');
         }
 
-        $prodStmt->bind_param('ii', $productId, $branchId);
-        $prodStmt->execute();
-        $prodRes = $prodStmt->get_result();
-        $product = $prodRes ? $prodRes->fetch_assoc() : null;
+        if ($isCustom) {
+            $customName = sanitize_clean_text($item['customName'] ?? $item['item_name'] ?? $item['product_name'] ?? 'Ítem personalizado', 'concepto del ítem', 255, true);
+            $rate = round(max(0.0, (float)($item['rate'] ?? 0)), 2);
+            if ($rate <= 0) {
+                throw new InvalidArgumentException("El ítem personalizado '{$customName}' debe tener un precio mayor a 0.");
+            }
+            $lineTotal = round($rate * $qty, 2);
+            $subTotal += $lineTotal;
 
-        if (!$product) {
-            throw new InvalidArgumentException('Producto #' . $productId . ' no encontrado en la sucursal activa.');
+            $resolvedItems[] = [
+                'product_id' => 0,
+                'item_name'  => $customName,
+                'quantity'   => (string)$qty,
+                'rate'       => number_format($rate, 2, '.', ''),
+                'total'      => number_format($lineTotal, 2, '.', ''),
+            ];
+        } else {
+            $prodStmt->bind_param('ii', $productId, $branchId);
+            $prodStmt->execute();
+            $prodRes = $prodStmt->get_result();
+            $product = $prodRes ? $prodRes->fetch_assoc() : null;
+
+            if (!$product) {
+                throw new InvalidArgumentException('Producto #' . $productId . ' no encontrado en la sucursal activa.');
+            }
+
+            $currentStock = (int)$product['quantity'];
+            if ($qty > $currentStock) {
+                throw new InvalidArgumentException("Stock insuficiente para {$product['product_name']} (disponible: {$currentStock}).");
+            }
+
+            $rate = round((float)$product['rate'], 2);
+            $lineTotal = round($rate * $qty, 2);
+            $subTotal += $lineTotal;
+
+            $newStock = (string)($currentStock - $qty);
+            $updProdStmt->bind_param('sii', $newStock, $productId, $branchId);
+            $updProdStmt->execute();
+
+            $resolvedItems[] = [
+                'product_id' => $productId,
+                'item_name'  => $product['product_name'],
+                'quantity'   => (string)$qty,
+                'rate'       => number_format($rate, 2, '.', ''),
+                'total'      => number_format($lineTotal, 2, '.', ''),
+            ];
         }
-
-        $currentStock = (int)$product['quantity'];
-        if ($qty > $currentStock) {
-            throw new InvalidArgumentException("Stock insuficiente para {$product['product_name']} (disponible: {$currentStock}).");
-        }
-
-        $rate = round((float)$product['rate'], 2);
-        $lineTotal = round($rate * $qty, 2);
-        $subTotal += $lineTotal;
-
-        $newStock = (string)($currentStock - $qty);
-        $updProdStmt->bind_param('sii', $newStock, $productId, $branchId);
-        $updProdStmt->execute();
-
-        $resolvedItems[] = [
-            'product_id' => $productId,
-            'quantity' => (string)$qty,
-            'rate' => number_format($rate, 2, '.', ''),
-            'total' => number_format($lineTotal, 2, '.', ''),
-        ];
     }
 
     $prodStmt->close();
@@ -147,9 +176,9 @@ try {
     $orderStmt->execute();
     $orderStmt->close();
 
-    $itemStmt = $connect->prepare('INSERT INTO order_item (order_id, product_id, quantity, rate, total, order_item_status) VALUES (?, ?, ?, ?, ?, 1)');
+    $itemStmt = $connect->prepare('INSERT INTO order_item (order_id, product_id, item_name, quantity, rate, total, order_item_status) VALUES (?, ?, ?, ?, ?, ?, 1)');
     foreach ($resolvedItems as $ri) {
-        $itemStmt->bind_param('iisss', $orderId, $ri['product_id'], $ri['quantity'], $ri['rate'], $ri['total']);
+        $itemStmt->bind_param('iissss', $orderId, $ri['product_id'], $ri['item_name'], $ri['quantity'], $ri['rate'], $ri['total']);
         $itemStmt->execute();
     }
     $itemStmt->close();

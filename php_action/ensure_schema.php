@@ -374,6 +374,15 @@ function ensure_app_schema(mysqli $connect): void
         }
     }
 
+    if (isset($colsMap['order_item']) && !sb_column_exists($colsMap, 'order_item', 'item_name')) {
+        $connect->query("ALTER TABLE `order_item` ADD COLUMN `item_name` varchar(255) DEFAULT NULL AFTER `product_id`");
+    }
+
+    if (isset($colsMap['orders']) && !sb_column_exists($colsMap, 'orders', 'client_id')) {
+        $connect->query("ALTER TABLE `orders` ADD COLUMN `client_id` int(11) DEFAULT NULL AFTER `branch_id`");
+        sb_ensure_index($connect, 'orders', 'idx_orders_client_id', '`client_id`');
+    }
+
     // 7. Seed baseline tenant #1 & global config atomically if absent
     $connect->query("INSERT IGNORE INTO `branches`
         (`branch_id`, `branch_code`, `branch_name`, `address`, `phone`, `email`, `manager_name`, `tax_rate`, `currency_code`, `currency_symbol`, `is_main`, `active`, `record_status`)

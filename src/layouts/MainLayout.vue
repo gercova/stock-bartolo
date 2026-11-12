@@ -42,39 +42,79 @@
         </button>
       </div>
 
-      <!-- Navigation Groups -->
-      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        <div v-for="group in navGroups" :key="group.label">
-          <p
-            v-if="!ui.sidebarCollapsed"
-            class="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400"
+      <!-- Navigation Accordion Modules (AdminLTE Style) -->
+      <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+        <div v-for="mod in navModules" :key="mod.id" class="rounded-xl">
+          <!-- Module Header Accordion Trigger -->
+          <button
+            type="button"
+            class="w-full group flex items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold tracking-wide transition-all duration-150 text-left"
+            :class="[
+              isModuleActive(mod)
+                ? 'bg-slate-800/90 text-indigo-300 font-bold border-l-2 border-indigo-500 shadow-xs'
+                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200',
+              ui.sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''
+            ]"
+            :title="ui.sidebarCollapsed ? mod.label : undefined"
+            @click="toggleModule(mod.id)"
           >
-            {{ group.label }}
-          </p>
-          <div class="space-y-1">
-            <RouterLink
-              v-for="item in group.items"
-              :key="item.to"
-              :to="item.to"
-              class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
-              :class="[
-                isActive(item)
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-slate-800/80 hover:text-white',
-                ui.sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''
-              ]"
-              :title="ui.sidebarCollapsed ? item.label : undefined"
-            >
-              <component :is="item.icon" class="h-5 w-5 shrink-0" />
-              <span v-if="!ui.sidebarCollapsed" class="truncate">{{ item.label }}</span>
+            <div class="flex items-center gap-2.5 min-w-0">
+              <component
+                :is="mod.icon"
+                class="h-4 w-4 shrink-0 transition-colors"
+                :class="isModuleActive(mod) ? 'text-indigo-400' : 'text-slate-400 group-hover:text-slate-200'"
+              />
+              <span v-if="!ui.sidebarCollapsed" class="truncate uppercase text-[11px] tracking-wider">{{ mod.label }}</span>
+            </div>
+
+            <div v-if="!ui.sidebarCollapsed" class="flex items-center gap-1.5 shrink-0">
               <span
-                v-if="!ui.sidebarCollapsed && item.badge"
-                class="ml-auto rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-200"
+                v-if="mod.badge"
+                class="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-300"
               >
-                {{ item.badge }}
+                {{ mod.badge }}
               </span>
-            </RouterLink>
-          </div>
+              <ChevronDown
+                class="h-3.5 w-3.5 text-slate-500 transition-transform duration-200"
+                :class="openModules[mod.id] ? 'rotate-180 text-indigo-400' : ''"
+              />
+            </div>
+          </button>
+
+          <!-- Submenu Items (Accordion Content) -->
+          <Transition name="accordion">
+            <div
+              v-show="openModules[mod.id] && !ui.sidebarCollapsed"
+              class="space-y-1 pt-1 pb-1 pl-3 ml-3 border-l border-slate-800"
+            >
+              <RouterLink
+                v-for="item in mod.items"
+                :key="item.to"
+                :to="item.to"
+                class="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors"
+                :class="[
+                  isActive(item)
+                    ? 'bg-indigo-600 text-white font-semibold shadow-xs'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white',
+                ]"
+                @click="ui.closeMobileMenu()"
+              >
+                <component
+                  :is="item.icon"
+                  class="h-4 w-4 shrink-0 transition-colors"
+                  :class="isActive(item) ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'"
+                />
+                <span class="truncate">{{ item.label }}</span>
+                <span
+                  v-if="item.badge"
+                  class="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  :class="isActive(item) ? 'bg-indigo-700 text-white' : 'bg-indigo-500/20 text-indigo-200'"
+                >
+                  {{ item.badge }}
+                </span>
+              </RouterLink>
+            </div>
+          </Transition>
         </div>
       </nav>
 
@@ -310,7 +350,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   Boxes,
@@ -360,36 +400,65 @@ const canSwitchBranch = computed(
   () => Boolean(auth.user?.can_switch_branches) && auth.branches.length > 0
 )
 
-const navGroups = [
+const navModules = [
   {
-    label: 'Principal',
+    id: 'dashboard',
+    label: 'Inicio & Analítica',
+    icon: LayoutDashboard,
     items: [
-      { label: 'Inicio', to: '/dashboard', icon: LayoutDashboard, match: ['/dashboard'] },
-      { label: 'Analítica General', to: '/analytics', icon: PieChart, match: ['/analytics'], badge: 'Gráficos' },
+      { label: 'Panel General', to: '/dashboard', icon: LayoutDashboard, match: ['/dashboard'] },
+      { label: 'Analítica del Negocio', to: '/analytics', icon: PieChart, match: ['/analytics'], badge: 'Gráficos' },
     ],
   },
   {
-    label: 'Inventario',
+    id: 'sales',
+    label: 'Ventas & Facturación',
+    icon: ShoppingCart,
     items: [
+      { label: 'Órdenes de Venta', to: '/orders', icon: ShoppingCart, match: ['/orders'] },
+      { label: 'Nueva Orden (POS)', to: '/orders/create', icon: PlusCircle, match: ['/orders/create'], badge: 'POS' },
+    ],
+  },
+  {
+    id: 'inventory',
+    label: 'Inventario & Almacén',
+    icon: Package,
+    items: [
+      { label: 'Productos', to: '/products', icon: Package, match: ['/products'] },
       { label: 'Fabricantes', to: '/brands', icon: Tag, match: ['/brands'] },
       { label: 'Categorías', to: '/categories', icon: FolderTree, match: ['/categories'] },
-      { label: 'Productos', to: '/products', icon: Package, match: ['/products'] },
     ],
   },
   {
-    label: 'Ventas y Finanzas',
+    id: 'cash',
+    label: 'Caja & Operaciones',
+    icon: Calculator,
     items: [
-      { label: 'Órdenes', to: '/orders', icon: ShoppingCart, match: ['/orders'] },
-      { label: 'Agregar Orden', to: '/orders/create', icon: PlusCircle, match: ['/orders/create'] },
-      { label: 'Caja', to: '/cash-register', icon: Calculator, match: ['/cash-register'], badge: 'Nuevo' },
-      { label: 'Operaciones', to: '/operations', icon: ArrowLeftRight, match: ['/operations'], badge: 'Puntos' },
-      { label: 'Préstamos', to: '/loans', icon: HandCoins, match: ['/loans'] },
-      { label: 'Clientes y Prov.', to: '/clients', icon: Users, match: ['/clients'] },
-      { label: 'Reportes', to: '/reports', icon: BarChart3, match: ['/reports'] },
+      { label: 'Caja Registradora', to: '/cash-register', icon: Calculator, match: ['/cash-register'], badge: 'Caja' },
+      { label: 'Operaciones Bóveda', to: '/operations', icon: ArrowLeftRight, match: ['/operations'], badge: 'Puntos' },
     ],
   },
   {
-    label: 'Sistema',
+    id: 'loans',
+    label: 'Créditos & Préstamos',
+    icon: HandCoins,
+    items: [
+      { label: 'Gestión de Préstamos', to: '/loans', icon: HandCoins, match: ['/loans'] },
+    ],
+  },
+  {
+    id: 'directory',
+    label: 'Directorio & Clientes',
+    icon: Users,
+    items: [
+      { label: 'Clientes y Proveedores', to: '/clients', icon: Users, match: ['/clients'] },
+      { label: 'Reportes de Venta', to: '/reports', icon: BarChart3, match: ['/reports'] },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'Sistema & Seguridad',
+    icon: ShieldCheck,
     items: [
       { label: 'Config. del Sistema', to: '/system-config', icon: SlidersHorizontal, match: ['/system-config'] },
       { label: 'Gestión de Seguridad', to: '/security', icon: ShieldCheck, match: ['/security'] },
@@ -397,6 +466,38 @@ const navGroups = [
     ],
   },
 ]
+
+// Accordion open/close state tracking
+const openModules = ref({
+  dashboard: true,
+  sales: true,
+  inventory: false,
+  cash: false,
+  loans: false,
+  directory: false,
+  system: false,
+})
+
+function isModuleActive(mod) {
+  return mod.items?.some((item) => isActive(item))
+}
+
+function toggleModule(id) {
+  if (ui.sidebarCollapsed) {
+    ui.toggleSidebar()
+  }
+  openModules.value[id] = !openModules.value[id]
+}
+
+function autoExpandActiveModule() {
+  for (const mod of navModules) {
+    if (mod.items?.some((item) => isActive(item))) {
+      openModules.value[mod.id] = true
+    }
+  }
+}
+
+watch(() => route.path, autoExpandActiveModule, { immediate: true })
 
 const pageTitle = computed(() => route.meta?.title || 'Panel')
 const breadcrumbs = computed(() => route.meta?.breadcrumb || ['Inicio'])
@@ -453,5 +554,14 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+.accordion-enter-active,
+.accordion-leave-active {
+  transition: all 0.18s ease-out;
+}
+.accordion-enter-from,
+.accordion-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

@@ -4,6 +4,13 @@ require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
 $branchId   = get_active_branch_id($connect);
+
+// Enforce open cash register for all commercial operations across all branches
+$openSession = sb_get_open_cash_session($connect, $branchId);
+if (!$openSession) {
+    send_http_error(400, 'Para registrar cobros o pagos de préstamos, la caja registradora de la sucursal debe estar abierta. Por favor, abre un turno de caja antes de continuar.');
+}
+
 $data       = get_request_data();
 
 $userId         = (int)$_SESSION['userId'];

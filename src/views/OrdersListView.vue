@@ -257,99 +257,12 @@
       </template>
     </BaseModal>
 
-    <!-- Print Invoice Modal -->
-    <BaseModal
+    <!-- Multi-Format Receipt Print Modal (Ticket, A5, A4) -->
+    <OrderReceiptModal
       :open="Boolean(printData)"
-      title="Comprobante de Orden"
-      size="lg"
+      :order-data="printData"
       @close="printData = null"
-    >
-      <div v-if="printData" class="space-y-5 text-sm">
-        <div class="flex flex-col sm:flex-row justify-between gap-3 border-b border-slate-200 pb-4">
-          <div>
-            <p class="text-xs uppercase font-semibold text-slate-400">
-              {{ auth.systemConfig?.company_name || 'Stock Bartolo' }}
-              <span v-if="printData.branch"> · {{ printData.branch.branch_name }}</span>
-            </p>
-            <h4 class="text-lg font-bold text-slate-900">Orden #{{ printData.order.order_id }}</h4>
-            <p class="text-slate-600">Fecha: {{ formatDate(printData.order.order_date) }}</p>
-          </div>
-          <div class="sm:text-right">
-            <p class="font-semibold text-slate-900">{{ printData.order.client_name }}</p>
-            <p class="text-slate-600">Tel: {{ printData.order.client_contact }}</p>
-            <p class="text-xs text-slate-500">{{ paymentMethodLabel(printData.order.payment_type) }}</p>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm border border-slate-200 rounded-xl">
-            <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
-              <tr>
-                <th class="px-3 py-2">#</th>
-                <th class="px-3 py-2">Producto</th>
-                <th class="px-3 py-2 text-right">Precio</th>
-                <th class="px-3 py-2 text-right">Cantidad</th>
-                <th class="px-3 py-2 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="(item, idx) in printData.items" :key="idx">
-                <td class="px-3 py-2">{{ idx + 1 }}</td>
-                <td class="px-3 py-2 font-medium">{{ item.product_name }}</td>
-                <td class="px-3 py-2 text-right">{{ formatCurrency(item.rate) }}</td>
-                <td class="px-3 py-2 text-right">{{ item.quantity }}</td>
-                <td class="px-3 py-2 text-right font-semibold">{{ formatCurrency(item.total) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-xl bg-slate-50 p-4 text-xs">
-          <div>
-            <p class="text-slate-500">Sub total</p>
-            <p class="font-bold text-slate-900 text-sm">{{ formatCurrency(printData.order.sub_total) }}</p>
-          </div>
-          <div>
-            <p class="text-slate-500">IVA ({{ Number(printData.branch?.tax_rate ?? auth.activeBranch?.tax_rate ?? 13) }}%)</p>
-            <p class="font-bold text-slate-900 text-sm">{{ formatCurrency(printData.order.vat) }}</p>
-          </div>
-          <div>
-            <p class="text-slate-500">Descuento</p>
-            <p class="font-bold text-slate-900 text-sm">{{ formatCurrency(printData.order.discount) }}</p>
-          </div>
-          <div>
-            <p class="text-slate-500">Total</p>
-            <p class="font-bold text-indigo-700 text-sm">{{ formatCurrency(printData.order.grand_total) }}</p>
-          </div>
-          <div>
-            <p class="text-slate-500">Pagado</p>
-            <p class="font-bold text-emerald-700 text-sm">{{ formatCurrency(printData.order.paid) }}</p>
-          </div>
-          <div>
-            <p class="text-slate-500">Pendiente</p>
-            <p class="font-bold text-amber-700 text-sm">{{ formatCurrency(printData.order.due) }}</p>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <button
-          type="button"
-          class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-          @click="printData = null"
-        >
-          Cerrar
-        </button>
-        <button
-          type="button"
-          class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2"
-          @click="printInvoice"
-        >
-          <Printer class="h-4 w-4" />
-          Imprimir
-        </button>
-      </template>
-    </BaseModal>
+    />
 
     <ConfirmModal
       :open="Boolean(deletingOrder)"
@@ -381,6 +294,7 @@ import { escapeHtml } from '@/utils/security'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
+import OrderReceiptModal from '@/components/orders/OrderReceiptModal.vue'
 
 const auth = useAuthStore()
 const store = useOrdersStore()
