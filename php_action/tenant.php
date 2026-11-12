@@ -10,6 +10,8 @@ function sb_get_system_config(mysqli $connect): array
     if (!$row) {
         return [
             'company_name'          => 'Stock Bartolo',
+            'company_legal_name'    => '',
+            'company_logo'          => '',
             'company_tax_id'        => '',
             'company_phone'         => '',
             'company_address'       => '',
@@ -21,22 +23,32 @@ function sb_get_system_config(mysqli $connect): array
             'auto_fund_till_from_general_cash'  => true,
             'auto_return_till_to_general_cash'  => true,
             'allow_branch_switching' => true,
+            'points_ratio_soles'    => 10.00,
+            'points_ratio_points'   => 1,
+            'print_double_ticket'   => true,
+            'commission_rate_per_100' => 1.00,
         ];
     }
 
     return [
-        'company_name'      => (string)$row['company_name'],
-        'company_tax_id'    => (string)($row['company_tax_id'] ?? ''),
-        'company_phone'     => (string)($row['company_phone'] ?? ''),
-        'company_address'   => (string)($row['company_address'] ?? ''),
-        'receipt_footer'    => (string)($row['receipt_footer'] ?? 'Gracias por su preferencia.'),
-        'default_tax_rate'  => round((float)$row['default_tax_rate'], 2),
+        'company_name'          => (string)$row['company_name'],
+        'company_legal_name'    => (string)($row['company_legal_name'] ?? ''),
+        'company_logo'          => (string)($row['company_logo'] ?? ''),
+        'company_tax_id'        => (string)($row['company_tax_id'] ?? ''),
+        'company_phone'         => (string)($row['company_phone'] ?? ''),
+        'company_address'       => (string)($row['company_address'] ?? ''),
+        'receipt_footer'        => (string)($row['receipt_footer'] ?? 'Gracias por su preferencia.'),
+        'default_tax_rate'      => round((float)$row['default_tax_rate'], 2),
         'default_currency_code' => (string)($row['default_currency_code'] ?? 'USD'),
         'default_currency_symbol' => (string)($row['default_currency_symbol'] ?? '$'),
         'enforce_open_till_for_cash' => ((int)$row['enforce_open_till_for_cash']) === 1,
         'auto_fund_till_from_general_cash' => ((int)$row['auto_fund_till_from_general_cash']) === 1,
         'auto_return_till_to_general_cash' => ((int)$row['auto_return_till_to_general_cash']) === 1,
         'allow_branch_switching' => ((int)$row['allow_branch_switching']) === 1,
+        'points_ratio_soles'    => round((float)($row['points_ratio_soles'] ?? 10.00), 2),
+        'points_ratio_points'   => (int)($row['points_ratio_points'] ?? 1),
+        'print_double_ticket'   => ((int)($row['print_double_ticket'] ?? 1)) === 1,
+        'commission_rate_per_100' => round((float)($row['commission_rate_per_100'] ?? 1.00), 2),
     ];
 }
 

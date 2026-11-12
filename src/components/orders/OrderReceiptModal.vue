@@ -73,11 +73,23 @@
         >
           <!-- Branch Header -->
           <div class="text-center space-y-1">
+            <img
+              v-if="companyInfo?.logo"
+              :src="resolveLogoUrl(companyInfo.logo)"
+              alt="Logo"
+              class="max-h-12 max-w-[130px] mx-auto object-contain mb-1"
+            />
+            <h1 v-if="companyInfo?.legal_name" class="text-xs font-black uppercase text-slate-900 leading-tight">
+              {{ companyInfo.legal_name }}
+            </h1>
             <h3 class="font-extrabold text-sm uppercase tracking-wider text-slate-900">
-              {{ branchInfo.branch_name || 'STOCK BARTOLO' }}
+              {{ companyInfo?.name || branchInfo.branch_name || 'STOCK BARTOLO' }}
             </h3>
+            <p v-if="companyInfo?.tax_id" class="text-[11px] font-bold text-slate-800">
+              RUC: {{ companyInfo.tax_id }}
+            </p>
             <p v-if="branchInfo.branch_code" class="text-[11px] text-slate-600 font-bold">
-              SUCURSAL: {{ branchInfo.branch_code }}
+              SUCURSAL: {{ branchInfo.branch_name }} ({{ branchInfo.branch_code }})
             </p>
             <p v-if="branchInfo.address" class="text-[10px] text-slate-600">
               {{ branchInfo.address }}
@@ -159,11 +171,26 @@
           </div>
 
           <!-- Optional Second Copy for Company/Cashier -->
-          <div v-if="doubleTicketCopy" class="pt-4 border-t-2 border-dashed border-slate-500 text-center space-y-3">
+          <div v-if="doubleTicketCopy" class="pt-4 border-t-2 border-dashed border-slate-500 text-center space-y-2">
             <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
               --- ✂ COPIA DE CONTROL (EMPRESA / CAJA) ✂ ---
             </p>
-            <div class="flex justify-between text-[10px]">
+            <img
+              v-if="companyInfo?.logo"
+              :src="resolveLogoUrl(companyInfo.logo)"
+              alt="Logo"
+              class="max-h-9 max-w-[100px] mx-auto object-contain mb-1"
+            />
+            <p v-if="companyInfo?.legal_name" class="text-[10px] font-bold uppercase text-slate-900">
+              {{ companyInfo.legal_name }}
+            </p>
+            <p class="text-xs font-bold uppercase text-slate-800">
+              {{ companyInfo?.name || branchInfo.branch_name || 'STOCK BARTOLO' }}
+            </p>
+            <p v-if="companyInfo?.tax_id" class="text-[10px] text-slate-700 font-semibold">
+              RUC: {{ companyInfo.tax_id }}
+            </p>
+            <div class="flex justify-between text-[10px] pt-1">
               <span>TICKET #{{ order.order_id }}</span>
               <span>TOTAL: {{ formatCurrency(order.grand_total) }}</span>
             </div>
@@ -180,14 +207,28 @@
         >
           <!-- Top Header Box -->
           <div class="flex justify-between items-start border-b-2 border-indigo-600 pb-3">
-            <div class="space-y-1">
-              <h3 class="font-black text-lg text-slate-900 tracking-tight">
-                {{ branchInfo.branch_name || 'STOCK BARTOLO' }}
-              </h3>
-              <p class="text-xs text-slate-600">{{ branchInfo.address || 'Casa Matriz' }}</p>
-              <p class="text-[11px] text-slate-500">
-                Teléfono: {{ branchInfo.phone || 'S/N' }} · Sucursal: {{ branchInfo.branch_code || 'SUC-001' }}
-              </p>
+            <div class="flex items-start gap-3">
+              <img
+                v-if="companyInfo?.logo"
+                :src="resolveLogoUrl(companyInfo.logo)"
+                alt="Logo"
+                class="max-h-12 max-w-[120px] object-contain rounded"
+              />
+              <div class="space-y-0.5">
+                <p v-if="companyInfo?.legal_name" class="text-xs font-black uppercase text-slate-900 leading-tight">
+                  {{ companyInfo.legal_name }}
+                </p>
+                <h3 class="font-black text-lg text-slate-900 tracking-tight">
+                  {{ companyInfo?.name || branchInfo.branch_name || 'STOCK BARTOLO' }}
+                </h3>
+                <p v-if="companyInfo?.tax_id" class="text-[11px] font-bold text-slate-800">
+                  RUC: {{ companyInfo.tax_id }}
+                </p>
+                <p class="text-xs text-slate-600">{{ branchInfo.address || 'Casa Matriz' }}</p>
+                <p class="text-[11px] text-slate-500">
+                  Tel: {{ branchInfo.phone || 'S/N' }} · Sucursal: {{ branchInfo.branch_name }} ({{ branchInfo.branch_code || 'SUC-001' }})
+                </p>
+              </div>
             </div>
             <div class="text-right rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 min-w-[170px]">
               <p class="text-[11px] font-bold text-indigo-700 uppercase">NOTA DE VENTA / PEDIDO</p>
@@ -291,24 +332,36 @@
         >
           <!-- Corporate Banner -->
           <div class="flex justify-between items-start border-b-2 border-slate-900 pb-4">
-            <div class="space-y-1.5">
-              <div class="flex items-center gap-2">
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white font-extrabold text-lg">
-                  SB
-                </div>
-                <h2 class="font-black text-xl text-slate-900 tracking-tight">
-                  {{ branchInfo.branch_name || 'STOCK BARTOLO' }}
-                </h2>
+            <div class="flex items-start gap-4">
+              <img
+                v-if="companyInfo?.logo"
+                :src="resolveLogoUrl(companyInfo.logo)"
+                alt="Logo"
+                class="max-h-16 max-w-[160px] object-contain rounded"
+              />
+              <div v-else class="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white font-extrabold text-xl">
+                SB
               </div>
-              <p class="text-xs text-slate-600">
-                Dirección: {{ branchInfo.address || 'Casa Matriz Central' }}
-              </p>
-              <p class="text-xs text-slate-600">
-                Teléfono: {{ branchInfo.phone || 'S/N' }} · Email: {{ branchInfo.email || 'contacto@stockbartolo.com' }}
-              </p>
-              <p class="text-xs font-semibold text-indigo-700">
-                Sucursal Activa: {{ branchInfo.branch_code || 'SUC-001' }}
-              </p>
+              <div class="space-y-1">
+                <p v-if="companyInfo?.legal_name" class="text-sm font-black uppercase text-slate-900 leading-tight">
+                  {{ companyInfo.legal_name }}
+                </p>
+                <h2 class="font-black text-2xl text-slate-900 tracking-tight">
+                  {{ companyInfo?.name || branchInfo.branch_name || 'STOCK BARTOLO' }}
+                </h2>
+                <p v-if="companyInfo?.tax_id" class="text-xs font-bold text-slate-800">
+                  RUC / Identificación Fiscal: {{ companyInfo.tax_id }}
+                </p>
+                <p class="text-xs text-slate-600">
+                  Dirección: {{ branchInfo.address || 'Casa Matriz Central' }}
+                </p>
+                <p class="text-xs text-slate-600">
+                  Teléfono: {{ branchInfo.phone || 'S/N' }} · Email: {{ branchInfo.email || 'contacto@stockbartolo.com' }}
+                </p>
+                <p class="text-xs font-semibold text-indigo-700">
+                  Sucursal Activa: {{ branchInfo.branch_name }} ({{ branchInfo.branch_code || 'SUC-001' }})
+                </p>
+              </div>
             </div>
 
             <div class="text-center rounded-2xl border-2 border-slate-900 p-4 min-w-[220px] space-y-1">
@@ -479,7 +532,14 @@ const doubleTicketCopy = ref(false)
 const order = computed(() => props.orderData?.order || null)
 const items = computed(() => props.orderData?.items || [])
 const branchInfo = computed(() => props.orderData?.branch || auth.activeBranch || {})
+const companyInfo = computed(() => props.orderData?.company || {})
 const branchTaxRate = computed(() => Number(branchInfo.value.tax_rate ?? 13))
+
+function resolveLogoUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path
+  return path.startsWith('/') ? path : `/${path}`
+}
 
 const formatLabel = computed(() => {
   if (selectedFormat.value === 'ticket') return 'Ticket Térmico (80mm)'

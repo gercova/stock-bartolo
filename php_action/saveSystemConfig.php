@@ -12,10 +12,22 @@ if (!sb_user_can_switch_branches($connect, $userId)) {
 $data = get_request_data();
 
 $companyName        = sanitize_clean_text($data['company_name'] ?? $data['companyName'] ?? '', 'nombre de empresa', 180, true);
+$companyLegalName   = sanitize_clean_text($data['company_legal_name'] ?? $data['companyLegalName'] ?? '', 'razón social', 200, false);
 $companyTaxId       = sanitize_clean_text($data['company_tax_id'] ?? $data['companyTaxId'] ?? '', 'NIT / identificación fiscal', 60, false);
 $companyPhone       = sanitize_clean_text($data['company_phone'] ?? $data['companyPhone'] ?? '', 'teléfono empresarial', 60, false);
 $companyAddress     = sanitize_clean_text($data['company_address'] ?? $data['companyAddress'] ?? '', 'dirección principal', 255, false);
 $receiptFooter      = sanitize_clean_text($data['receipt_footer'] ?? $data['receiptFooter'] ?? 'Gracias por su preferencia.', 'pie de comprobante', 255, false);
+
+$currentConfig = sb_get_system_config($connect);
+$companyLogo = $currentConfig['company_logo'] ?? '';
+if (!empty($_FILES['company_logo']['tmp_name'])) {
+    $companyLogo = process_uploaded_company_logo($_FILES['company_logo']);
+} elseif (!empty($_FILES['logo']['tmp_name'])) {
+    $companyLogo = process_uploaded_company_logo($_FILES['logo']);
+} elseif (isset($data['company_logo']) || isset($data['companyLogo'])) {
+    $companyLogo = sanitize_logo_path_or_url((string)($data['company_logo'] ?? $data['companyLogo'] ?? ''));
+}
+
 $defaultTaxRate     = round((float)($data['default_tax_rate'] ?? $data['defaultTaxRate'] ?? 13.0), 2);
 $defaultCurrencyCode = strtoupper(sanitize_clean_text($data['default_currency_code'] ?? $data['defaultCurrencyCode'] ?? 'USD', 'moneda predeterminada', 10, true));
 $defaultCurrencySymbol = sanitize_clean_text($data['default_currency_symbol'] ?? $data['defaultCurrencySymbol'] ?? '$', 'símbolo de moneda', 8, true);
@@ -34,10 +46,12 @@ if ($defaultTaxRate < 0 || $defaultTaxRate > 100) {
     send_http_error(400, 'La tasa de IVA predeterminada debe estar entre 0% y 100%.');
 }
 
-$stmt = $connect->prepare('UPDATE system_settings SET company_name = ?, company_tax_id = ?, company_phone = ?, company_address = ?, receipt_footer = ?, default_tax_rate = ?, default_currency_code = ?, default_currency_symbol = ?, enforce_open_till_for_cash = ?, auto_fund_till_from_general_cash = ?, auto_return_till_to_general_cash = ?, allow_branch_switching = ?, points_ratio_soles = ?, points_ratio_points = ?, print_double_ticket = ?, commission_rate_per_100 = ?, updated_by = ? WHERE setting_id = 1');
+$stmt = $connect->prepare('UPDATE system_settings SET company_name = ?, company_legal_name = ?, company_logo = ?, company_tax_id = ?, company_phone = ?, company_address = ?, receipt_footer = ?, default_tax_rate = ?, default_currency_code = ?, default_currency_symbol = ?, enforce_open_till_for_cash = ?, auto_fund_till_from_general_cash = ?, auto_return_till_to_general_cash = ?, allow_branch_switching = ?, points_ratio_soles = ?, points_ratio_points = ?, print_double_ticket = ?, commission_rate_per_100 = ?, updated_by = ? WHERE setting_id = 1');
 $stmt->bind_param(
-    'sssssdssiiiidiidi',
+    'sssssssdssiiiidiidi',
     $companyName,
+    $companyLegalName,
+    $companyLogo,
     $companyTaxId,
     $companyPhone,
     $companyAddress,

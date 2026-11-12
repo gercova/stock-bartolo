@@ -1,12 +1,12 @@
 <template>
   <div v-if="client" class="w-full max-w-2xl text-xs text-slate-800">
     <!-- Top Horizontal Divider Line (Matches exact reference screenshot) -->
-    <div v-if="divider" class="border-t border-slate-200 my-2.5"></div>
+    <div v-if="divider" class="border-t border-[#e5e5e5] my-2"></div>
 
     <div class="space-y-1">
       <!-- Row 1: Document Type & Number -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-bold text-[#337ab7] pr-5 shrink-0">
           {{ formattedDocType }}:
         </span>
         <span class="font-bold text-slate-900">
@@ -16,7 +16,7 @@
 
       <!-- Row 2: Customer Name -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           Cliente:
         </span>
         <span class="font-normal text-slate-800">
@@ -26,15 +26,15 @@
 
       <!-- Row 3: Birthdate and Age -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           F. Nac.:
         </span>
-        <div class="flex items-baseline gap-10">
+        <div class="flex items-baseline gap-12 sm:gap-16">
           <span class="text-slate-800">
             {{ client.birth_date && client.birth_date !== '0000-00-00' ? client.birth_date : '0000-00-00' }}
           </span>
           <div class="flex items-baseline gap-2">
-            <span class="font-medium text-[#1f6497]">Edad:</span>
+            <span class="font-normal text-[#337ab7]">Edad:</span>
             <span class="text-slate-800">{{ age }}</span>
           </div>
         </div>
@@ -42,7 +42,7 @@
 
       <!-- Row 4: Gender -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           Sexo:
         </span>
         <span class="text-slate-800">
@@ -52,7 +52,7 @@
 
       <!-- Row 5: Email -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           Correo:
         </span>
         <span class="text-slate-800">
@@ -62,7 +62,7 @@
 
       <!-- Row 6: Address -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           Dirección:
         </span>
         <span class="text-slate-800">
@@ -72,7 +72,7 @@
 
       <!-- Row 7: Phone / Mobile -->
       <div class="flex items-baseline">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           Teléfono/Cel:
         </span>
         <span class="text-slate-800">
@@ -82,7 +82,7 @@
 
       <!-- Optional Row 8: Loyalty Points (for operations & rewards) -->
       <div v-if="showPoints" class="flex items-baseline pt-1">
-        <span class="w-24 sm:w-28 text-right font-medium text-[#1f6497] pr-3 shrink-0">
+        <span class="w-[110px] text-right font-normal text-[#337ab7] pr-5 shrink-0">
           Puntos:
         </span>
         <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">

@@ -73,7 +73,14 @@ export const useAuthStore = defineStore('auth', () => {
       checked.value = true
       return { ok: true, message: data?.messages || 'Inicio de sesión exitoso' }
     } catch (err) {
-      return { ok: false, message: extractErrorMessage(err, 'Credenciales inválidas.') }
+      const retryAfter = Number(err.response?.data?.data?.retryAfter || err.response?.headers?.['retry-after'] || 0)
+      const status = err.response?.status
+      return {
+        ok: false,
+        status,
+        retryAfter,
+        message: extractErrorMessage(err, 'Credenciales inválidas.'),
+      }
     } finally {
       loading.value = false
     }

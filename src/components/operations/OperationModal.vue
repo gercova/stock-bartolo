@@ -120,7 +120,7 @@
         <!-- Client Selector Row: Select2 Input + Green Plus Button (RENIEC / SUNAT) -->
         <div class="space-y-1">
           <div class="flex items-center justify-between">
-            <label class="block text-xs font-semibold text-[#1f6497]">
+            <label class="block text-xs font-normal text-[#337ab7]">
               Cliente:
             </label>
             <span v-if="activeClient" class="text-xs text-amber-600 font-semibold flex items-center gap-1">

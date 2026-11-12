@@ -620,3 +620,95 @@ function process_uploaded_product_image(array $file): string
     return '../assests/images/stock/' . $filename;
 }
 
+function process_uploaded_company_logo(array $file): string
+{
+    if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
+        send_http_error(400, 'Error al subir el logo corporativo.');
+    }
+
+    $tmpName = $file['tmp_name'] ?? '';
+    if (!is_string($tmpName) || $tmpName === '' || !is_uploaded_file($tmpName)) {
+        send_http_error(400, 'Archivo de logo inválido.');
+    }
+
+    $size = (int)($file['size'] ?? 0);
+    if ($size <= 0 || $size > 5 * 1024 * 1024) {
+        send_http_error(400, 'El archivo de logo debe pesar entre 1 byte y 5 MB.');
+    }
+
+    $ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+    $allowedExts = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'avif'];
+    if (!in_array($ext, $allowedExts, true)) {
+        send_http_error(400, 'Formato de logo no permitido. Formatos soportados: PNG, JPG, JPEG, WEBP, SVG o GIF.');
+    }
+
+    $mimeMap = [
+        'image/jpeg'        => 'jpg',
+        'image/png'         => 'png',
+        'image/webp'        => 'webp',
+        'image/svg+xml'     => 'svg',
+        'image/gif'         => 'gif',
+        'image/avif'        => 'avif',
+    ];
+
+    $finfo          = new finfo(FILEINFO_MIME_TYPE);
+    $detectedMime   = $finfo->file($tmpName);
+
+    // Fallback detection for SVG which might be detected as text/plain or text/xml
+    if ($ext === 'svg' && ($detectedMime === 'text/plain' || $detectedMime === 'text/xml' || $detectedMime === 'image/svg+xml')) {
+        $detectedMime = 'image/svg+xml';
+    }
+
+    if (!is_string($detectedMime) || !isset($mimeMap[$detectedMime])) {
+        send_http_error(400, 'El archivo subido no corresponde a un formato de imagen permitido (PNG, JPG, JPEG, WEBP, SVG, GIF).');
+    }
+
+    // If SVG, check for potential XSS scripts
+    if ($detectedMime === 'image/svg+xml') {
+        $svgContent = file_get_contents($tmpName);
+        if ($svgContent === false || stripos($svgContent, '<script') !== false || stripos($svgContent, 'javascript:') !== false) {
+            send_http_error(400, 'El archivo SVG contiene contenido no permitido.');
+        }
+    } else {
+        $imageInfo = @getimagesize($tmpName);
+        if ($imageInfo === false || empty($imageInfo[0]) || empty($imageInfo[1])) {
+            send_http_error(400, 'La imagen de logo no contiene dimensiones válidas.');
+        }
+    }
+
+    $canonicalExt = $mimeMap[$detectedMime];
+    $uploadDir = dirname(__DIR__) . '/assests/images/logos';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0775, true);
+    }
+
+    $filename = 'logo_' . bin2hex(random_bytes(12)) . '.' . $canonicalExt;
+    $destDisk = $uploadDir . '/' . $filename;
+
+    if (!move_uploaded_file($tmpName, $destDisk)) {
+        send_http_error(500, 'No se pudo almacenar el logo corporativo en el servidor.');
+    }
+
+    @chmod($destDisk, 0644);
+    return 'assests/images/logos/' . $filename;
+}
+
+function sanitize_logo_path_or_url(string $val): string
+{
+    $val = trim($val);
+    if ($val === '') return '';
+    // Allow data URLs for images
+    if (preg_match('/^data:image\/(?:png|jpeg|jpg|webp|svg\+xml|gif);base64,[A-Za-z0-9+\/]+=*$/', $val)) {
+        return $val;
+    }
+    // Allow local paths
+    $val = ltrim($val, '/');
+    if (str_starts_with($val, 'assests/images/')) {
+        return $val;
+    }
+    if (filter_var($val, FILTER_VALIDATE_URL)) {
+        return $val;
+    }
+    return '';
+}
+

@@ -45,11 +45,20 @@
           <!-- TICKET 1: COPIA CLIENTE -->
           <div class="ticket-copy space-y-3">
             <div class="text-center space-y-0.5">
+              <img
+                v-if="receiptData.company?.logo"
+                :src="resolveLogoUrl(receiptData.company.logo)"
+                alt="Logo"
+                class="max-h-12 max-w-[130px] mx-auto object-contain mb-1"
+              />
+              <h1 v-if="receiptData.company?.legal_name" class="text-xs font-black uppercase text-slate-900 leading-tight">
+                {{ receiptData.company.legal_name }}
+              </h1>
               <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-900">
                 {{ receiptData.company?.name || 'STOCK BARTOLO' }}
               </h2>
-              <p v-if="receiptData.company?.tax_id" class="text-[11px] text-slate-600">
-                RUC/NIT: {{ receiptData.company.tax_id }}
+              <p v-if="receiptData.company?.tax_id" class="text-[11px] font-bold text-slate-800">
+                RUC: {{ receiptData.company.tax_id }}
               </p>
               <p class="text-[11px] font-bold text-slate-700">
                 {{ receiptData.branch?.branch_name || 'Sucursal Principal' }}
@@ -141,9 +150,21 @@
             </div>
 
             <div class="text-center space-y-0.5">
+              <img
+                v-if="receiptData.company?.logo"
+                :src="resolveLogoUrl(receiptData.company.logo)"
+                alt="Logo"
+                class="max-h-12 max-w-[130px] mx-auto object-contain mb-1"
+              />
+              <h1 v-if="receiptData.company?.legal_name" class="text-xs font-black uppercase text-slate-900 leading-tight">
+                {{ receiptData.company.legal_name }}
+              </h1>
               <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-900">
                 {{ receiptData.company?.name || 'STOCK BARTOLO' }}
               </h2>
+              <p v-if="receiptData.company?.tax_id" class="text-[11px] font-bold text-slate-800">
+                RUC: {{ receiptData.company.tax_id }}
+              </p>
               <p class="text-[11px] font-bold text-slate-700">
                 {{ receiptData.branch?.branch_name || 'Sucursal Principal' }}
               </p>
@@ -255,6 +276,12 @@ watch(
 
 function close() {
   emit('update:modelValue', false)
+}
+
+function resolveLogoUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path
+  return path.startsWith('/') ? path : `/${path}`
 }
 
 function printTicket() {

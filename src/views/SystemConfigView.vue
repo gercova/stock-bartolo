@@ -628,25 +628,95 @@
             </div>
           </div>
 
+          <!-- Logo Corporativo -->
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Nombre de la empresa *</label>
-            <input
-              v-model.trim="settingsForm.company_name"
-              type="text"
-              required
-              maxlength="180"
-              :disabled="!store.canSwitchBranches"
-              class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100"
-            />
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">
+              Logo de la empresa
+            </label>
+            <div class="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <div
+                class="flex h-16 w-16 items-center justify-center rounded-xl border border-slate-300 bg-white shadow-xs overflow-hidden shrink-0"
+              >
+                <img
+                  v-if="settingsForm.company_logo"
+                  :src="resolveLogoUrl(settingsForm.company_logo)"
+                  alt="Logo"
+                  class="h-full w-full object-contain p-1"
+                />
+                <Store v-else class="h-8 w-8 text-slate-400" />
+              </div>
+
+              <div class="flex-1 space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <input
+                    ref="logoFileInput"
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml, image/gif"
+                    class="hidden"
+                    @change="onLogoFileSelected"
+                  />
+                  <button
+                    type="button"
+                    :disabled="uploadingLogo || !store.canSwitchBranches"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 cursor-pointer"
+                    @click="logoFileInput?.click()"
+                  >
+                    <Upload v-if="!uploadingLogo" class="h-3.5 w-3.5" />
+                    <Loader2 v-else class="h-3.5 w-3.5 animate-spin" />
+                    {{ uploadingLogo ? 'Subiendo...' : 'Subir nuevo logo' }}
+                  </button>
+                  <button
+                    v-if="settingsForm.company_logo"
+                    type="button"
+                    :disabled="uploadingLogo || !store.canSwitchBranches"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-rose-50 hover:text-rose-700 px-3 py-1.5 text-xs font-semibold text-slate-700 transition cursor-pointer"
+                    @click="removeLogo"
+                  >
+                    <Trash2 class="h-3.5 w-3.5 text-rose-600" />
+                    Quitar logo
+                  </button>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-tight">
+                  Formatos soportados: <strong>PNG, JPEG, JPG, WebP, SVG, GIF</strong> (máx. 5 MB). Se mostrará en el login y en todos los comprobantes.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">NIT / Registro Fiscal</label>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Nombre Comercial (Trade Name) *</label>
+              <input
+                v-model.trim="settingsForm.company_name"
+                type="text"
+                required
+                maxlength="180"
+                placeholder="Ej. Stock Bartolo"
+                :disabled="!store.canSwitchBranches"
+                class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Razón Social (Legal Business Name)</label>
+              <input
+                v-model.trim="settingsForm.company_legal_name"
+                type="text"
+                maxlength="200"
+                placeholder="Ej. Bartolo Inversiones & Servicios S.A.C."
+                :disabled="!store.canSwitchBranches"
+                class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">RUC / Identificación Fiscal (Tax ID)</label>
               <input
                 v-model.trim="settingsForm.company_tax_id"
                 type="text"
                 maxlength="60"
+                placeholder="Ej. 20601234567"
                 :disabled="!store.canSwitchBranches"
                 class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-100"
               />
@@ -657,6 +727,7 @@
                 v-model.trim="settingsForm.company_phone"
                 type="text"
                 maxlength="60"
+                placeholder="Ej. (01) 456-7890"
                 :disabled="!store.canSwitchBranches"
                 class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-100"
               />
@@ -891,6 +962,7 @@ import {
   Lock,
   ShieldCheck,
   CheckCircle2,
+  Upload,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/systemConfig'
@@ -935,8 +1007,39 @@ const deletingBranchLoading = ref(false)
 
 // Global Settings form
 const savingSettings = ref(false)
+const logoFileInput = ref(null)
+const uploadingLogo = ref(false)
+
+function resolveLogoUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) return path
+  return path.startsWith('/') ? path : `/${path}`
+}
+
+async function onLogoFileSelected(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  uploadingLogo.value = true
+  try {
+    const res = await store.uploadLogo(file)
+    settingsForm.company_logo = res.logo_url
+    ui.success('Logo de la empresa actualizado exitosamente.')
+  } catch (err) {
+    ui.error(extractErrorMessage(err))
+  } finally {
+    uploadingLogo.value = false
+    if (logoFileInput.value) logoFileInput.value.value = ''
+  }
+}
+
+function removeLogo() {
+  settingsForm.company_logo = ''
+}
+
 const settingsForm = reactive({
   company_name: 'Stock Bartolo',
+  company_legal_name: '',
+  company_logo: '',
   company_tax_id: '',
   company_phone: '',
   company_address: '',
@@ -948,6 +1051,10 @@ const settingsForm = reactive({
   auto_fund_till_from_general_cash: true,
   auto_return_till_to_general_cash: true,
   allow_branch_switching: true,
+  points_ratio_soles: 10.0,
+  points_ratio_points: 1,
+  print_double_ticket: true,
+  commission_rate_per_100: 1.0,
 })
 
 const vaultCurrency = computed(() => store.generalCashBranch?.currency_code || 'USD')
@@ -989,6 +1096,8 @@ const filteredBranches = computed(() => {
 function syncSettingsForm(cfg) {
   if (!cfg) return
   settingsForm.company_name = cfg.company_name || 'Stock Bartolo'
+  settingsForm.company_legal_name = cfg.company_legal_name || ''
+  settingsForm.company_logo = cfg.company_logo || ''
   settingsForm.company_tax_id = cfg.company_tax_id || ''
   settingsForm.company_phone = cfg.company_phone || ''
   settingsForm.company_address = cfg.company_address || ''
@@ -1000,6 +1109,10 @@ function syncSettingsForm(cfg) {
   settingsForm.auto_fund_till_from_general_cash = Boolean(cfg.auto_fund_till_from_general_cash)
   settingsForm.auto_return_till_to_general_cash = Boolean(cfg.auto_return_till_to_general_cash)
   settingsForm.allow_branch_switching = Boolean(cfg.allow_branch_switching)
+  settingsForm.points_ratio_soles = Number(cfg.points_ratio_soles ?? 10.0)
+  settingsForm.points_ratio_points = Number(cfg.points_ratio_points ?? 1)
+  settingsForm.print_double_ticket = Boolean(cfg.print_double_ticket ?? true)
+  settingsForm.commission_rate_per_100 = Number(cfg.commission_rate_per_100 ?? 1.0)
 }
 
 function setTab(tab) {
@@ -1119,6 +1232,7 @@ async function confirmDeleteBranch() {
 async function submitSystemSettings() {
   const unsafe = findUnsafeField({
     Empresa: settingsForm.company_name,
+    'Razón Social': settingsForm.company_legal_name,
     NIT: settingsForm.company_tax_id,
     Teléfono: settingsForm.company_phone,
     Dirección: settingsForm.company_address,

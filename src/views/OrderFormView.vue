@@ -99,8 +99,8 @@
         </div>
 
         <!-- Customer Search & Details Block (Matches exact reference screenshot) -->
-        <div class="space-y-1 max-w-2xl">
-          <label class="block text-xs font-semibold text-[#1f6497]">Cliente:</label>
+        <div id="customer-box" class="space-y-1 max-w-2xl">
+          <label class="block text-xs font-normal text-[#337ab7]">Cliente:</label>
           <div class="flex items-center gap-2">
             <!-- Custom Select2 Client Component (Zero NPM dependencies) -->
             <div class="flex-1">

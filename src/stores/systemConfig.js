@@ -9,6 +9,8 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
   const canSwitchBranches = ref(true)
   const config = ref({
     company_name: 'Stock Bartolo',
+    company_legal_name: '',
+    company_logo: '',
     company_tax_id: '',
     company_phone: '',
     company_address: '',
@@ -129,6 +131,20 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
     return data
   }
 
+  async function uploadLogo(file) {
+    const formData = new FormData()
+    formData.append('logo', file)
+    const { data } = await apiClient.post('/uploadCompanyLogo.php', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    if (data?.config) {
+      config.value = data.config
+      const auth = useAuthStore()
+      auth.applyTenantPayload({ systemConfig: data.config })
+    }
+    return data
+  }
+
   async function fetchGeneralCash(branchId = null) {
     loadingGeneralCash.value = true
     try {
@@ -211,6 +227,7 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
     deleteBranch,
     fetchSystemConfig,
     saveSystemConfig,
+    uploadLogo,
     fetchGeneralCash,
     updateGeneralCashAccount,
     addGeneralCashMovement,

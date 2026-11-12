@@ -80,7 +80,9 @@ $data = [
     ],
     'company' => [
         'name' => (string)($sysConfig['company_name'] ?? 'Stock Bartolo'),
+        'legal_name' => (string)($sysConfig['company_legal_name'] ?? ''),
         'tax_id' => (string)($sysConfig['company_tax_id'] ?? ''),
+        'logo' => (string)($sysConfig['company_logo'] ?? ''),
         'address' => (string)($sysConfig['company_address'] ?? ''),
         'phone' => (string)($sysConfig['company_phone'] ?? ''),
         'receipt_footer' => (string)($sysConfig['receipt_footer'] ?? 'Gracias por su preferencia.'),

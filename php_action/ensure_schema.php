@@ -76,6 +76,8 @@ function ensure_app_schema(mysqli $connect): void
     $connect->query("CREATE TABLE IF NOT EXISTS `system_settings` (
         `setting_id` int(11) NOT NULL,
         `company_name` varchar(180) NOT NULL DEFAULT 'Stock Bartolo',
+        `company_legal_name` varchar(200) NOT NULL DEFAULT '',
+        `company_logo` varchar(255) NOT NULL DEFAULT '',
         `company_tax_id` varchar(60) DEFAULT '',
         `company_phone` varchar(60) DEFAULT '',
         `company_address` varchar(255) DEFAULT '',
@@ -582,6 +584,8 @@ function ensure_app_schema(mysqli $connect): void
     }
 
     // 12. Loyalty and Operations Settings in system_settings
+    sb_ensure_table_column($connect, 'system_settings', 'company_legal_name', "VARCHAR(200) NOT NULL DEFAULT '' AFTER `company_name`");
+    sb_ensure_table_column($connect, 'system_settings', 'company_logo', "VARCHAR(255) NOT NULL DEFAULT '' AFTER `company_legal_name`");
     sb_ensure_table_column($connect, 'system_settings', 'points_ratio_soles', 'DECIMAL(10,2) NOT NULL DEFAULT 10.00 AFTER `allow_branch_switching`');
     sb_ensure_table_column($connect, 'system_settings', 'points_ratio_points', 'INT NOT NULL DEFAULT 1 AFTER `points_ratio_soles`');
     sb_ensure_table_column($connect, 'system_settings', 'print_double_ticket', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER `points_ratio_points`');

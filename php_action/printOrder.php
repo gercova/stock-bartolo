@@ -41,11 +41,21 @@ while ($row = $itemRes->fetch_assoc()) {
     ];
 }
 $itemStmt->close();
+$sysConfig = sb_get_system_config($connect);
 $connect->close();
 
 json_response([
     'success'   => true,
     'branch'    => $activeBranch,
+    'company'   => [
+        'name'          => (string)($sysConfig['company_name'] ?? 'Stock Bartolo'),
+        'legal_name'    => (string)($sysConfig['company_legal_name'] ?? ''),
+        'tax_id'        => (string)($sysConfig['company_tax_id'] ?? ''),
+        'logo'          => (string)($sysConfig['company_logo'] ?? ''),
+        'phone'         => (string)($sysConfig['company_phone'] ?? ''),
+        'address'       => (string)($sysConfig['company_address'] ?? ''),
+        'receipt_footer'=> (string)($sysConfig['receipt_footer'] ?? 'Gracias por su preferencia.'),
+    ],
     'order'     => [
         'order_id' => (int)$order['order_id'],
         'branch_id' => (int)$order['branch_id'],
