@@ -39,9 +39,35 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
   const generalCashMovements = ref([])
   const branchVaults = ref([])
 
+  // Bank Capital State (Multi-Bank Funds Management)
+  const bankAccounts = ref([])
+  const bankSummary = ref({
+    total_capital: 0,
+    total_deposited: 0,
+    active_accounts_count: 0,
+    total_deposits_count: 0,
+    general_cash_balance: 0,
+    by_bank: {},
+  })
+  const bankDeposits = ref([])
+  const bankDepositsPagination = ref({
+    total: 0,
+    page: 1,
+    per_page: 25,
+    total_pages: 1,
+    has_more: false,
+    from: 0,
+    to: 0,
+    chunk_size: 25,
+    current_chunk: 1,
+    total_chunks: 1,
+  })
+
   const loadingBranches = ref(false)
   const loadingConfig = ref(false)
   const loadingGeneralCash = ref(false)
+  const loadingBankCapital = ref(false)
+  const submittingBankDeposit = ref(false)
 
   async function fetchBranches() {
     loadingBranches.value = true
@@ -208,6 +234,60 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
     return data
   }
 
+  async function fetchBankCapital(params = {}, appendChunk = false) {
+    loadingBankCapital.value = true
+    try {
+      const { data } = await apiClient.get('/fetchBankCapital.php', { params })
+      if (data?.accounts) {
+        bankAccounts.value = data.accounts
+      }
+      if (data?.summary) {
+        bankSummary.value = data.summary
+      }
+      if (data?.pagination) {
+        bankDepositsPagination.value = data.pagination
+      }
+
+      const rows = Array.isArray(data?.deposits) ? data.deposits : []
+      if (appendChunk) {
+        // Progressive Chunk Loading mode: append non-duplicate records
+        const existingIds = new Set(bankDeposits.value.map((d) => d.deposit_id))
+        const newItems = rows.filter((d) => !existingIds.has(d.deposit_id))
+        bankDeposits.value = [...bankDeposits.value, ...newItems]
+      } else {
+        bankDeposits.value = rows
+      }
+
+      return data
+    } finally {
+      loadingBankCapital.value = false
+    }
+  }
+
+  async function createBankCapitalDeposit(payload) {
+    submittingBankDeposit.value = true
+    try {
+      const { data } = await apiClient.post('/createBankCapitalDeposit.php', payload)
+      // Refresh bank capital and general cash if deducted
+      await fetchBankCapital({ branchId: payload.branch_id || activeBranchId.value })
+      if (payload.deduct_from_general_cash) {
+        await Promise.all([
+          fetchGeneralCash(payload.branch_id || activeBranchId.value),
+          fetchBranches(),
+        ])
+      }
+      return data
+    } finally {
+      submittingBankDeposit.value = false
+    }
+  }
+
+  async function updateBankCapitalAccount(payload) {
+    const { data } = await apiClient.post('/updateBankCapitalAccount.php', payload)
+    await fetchBankCapital({ branchId: payload.branch_id || activeBranchId.value })
+    return data
+  }
+
   return {
     branches,
     activeBranchId,
@@ -218,9 +298,15 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
     generalCashSummary,
     generalCashMovements,
     branchVaults,
+    bankAccounts,
+    bankSummary,
+    bankDeposits,
+    bankDepositsPagination,
     loadingBranches,
     loadingConfig,
     loadingGeneralCash,
+    loadingBankCapital,
+    submittingBankDeposit,
     fetchBranches,
     createBranch,
     updateBranch,
@@ -233,5 +319,8 @@ export const useSystemConfigStore = defineStore('systemConfig', () => {
     addGeneralCashMovement,
     updateGeneralCashMovement,
     voidGeneralCashMovement,
+    fetchBankCapital,
+    createBankCapitalDeposit,
+    updateBankCapitalAccount,
   }
 })

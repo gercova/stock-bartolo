@@ -50,8 +50,28 @@
         "
         @click="setTab('general-cash')"
       >
-        <Landmark class="h-4 w-4" />
+        <Wallet class="h-4 w-4" />
         Caja General
+      </button>
+
+      <button
+        type="button"
+        class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition cursor-pointer"
+        :class="
+          activeTab === 'bank-capital'
+            ? 'bg-indigo-600 text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        "
+        @click="setTab('bank-capital')"
+      >
+        <Landmark class="h-4 w-4" />
+        Capital Bancario
+        <span
+          class="rounded-full px-2 py-0.5 text-[11px] font-bold"
+          :class="activeTab === 'bank-capital' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'"
+        >
+          {{ store.bankAccounts.length }}
+        </span>
       </button>
 
       <button
@@ -458,7 +478,381 @@
     </section>
 
     <!-- ========================================================= -->
-    <!-- TAB 2: SUCURSALES (MULTI-TENANT CRUD)                     -->
+    <!-- TAB 2: CAPITAL BANCARIO & AUDITORÍA DE DEPÓSITOS           -->
+    <!-- ========================================================= -->
+    <section v-else-if="activeTab === 'bank-capital'" class="space-y-6">
+      <!-- 1. Header Metrics Banner -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Card 1: Total Capital Bancario -->
+        <div class="rounded-2xl border border-indigo-100 bg-linear-to-br from-indigo-900 via-indigo-800 to-indigo-950 p-5 text-white shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div class="absolute -right-4 -bottom-4 w-28 h-28 rounded-full bg-white/5 pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-200">Capital Total en Bancos</span>
+              <div class="rounded-xl bg-white/10 p-2 text-indigo-200">
+                <Landmark class="h-4 w-4" />
+              </div>
+            </div>
+            <p class="mt-3 text-2xl lg:text-3xl font-extrabold font-mono tracking-tight">
+              S/ {{ Number(store.bankSummary.total_capital || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+            </p>
+          </div>
+          <p class="mt-3 text-[11px] text-indigo-200">
+            Fondos disponibles en {{ store.bankAccounts.filter(a => a.status === 1).length }} entidades activas
+          </p>
+        </div>
+
+        <!-- Card 2: Total Depósitos Acumulados -->
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Capital Inyectado</span>
+              <div class="rounded-xl bg-emerald-50 p-2 text-emerald-600">
+                <TrendingUp class="h-4 w-4" />
+              </div>
+            </div>
+            <p class="mt-3 text-2xl lg:text-3xl font-extrabold font-mono text-emerald-700 tracking-tight">
+              S/ {{ Number(store.bankSummary.total_deposited || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+            </p>
+          </div>
+          <p class="mt-3 text-[11px] text-slate-500">
+            En {{ store.bankSummary.total_deposits_count || 0 }} depósitos de auditoría registrados
+          </p>
+        </div>
+
+        <!-- Card 3: Caja General de la Sucursal -->
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Caja General (Bóveda)</span>
+              <div class="rounded-xl bg-amber-50 p-2 text-amber-600">
+                <Wallet class="h-4 w-4" />
+              </div>
+            </div>
+            <p class="mt-3 text-2xl lg:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
+              S/ {{ Number(store.bankSummary.general_cash_balance || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+            </p>
+          </div>
+          <p class="mt-3 text-[11px] text-slate-500">
+            Fondo físico disponible para traslados y fondeo
+          </p>
+        </div>
+
+        <!-- Card 4: Quick Action -->
+        <div class="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/40 p-5 flex flex-col justify-between items-center text-center">
+          <div class="space-y-1">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-900">Inyección de Fondos</h4>
+            <p class="text-[11px] text-indigo-700">Registrar nuevo aporte o depósito bancario a una institución</p>
+          </div>
+          <button
+            type="button"
+            class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 active:scale-95 transition shadow-xs cursor-pointer"
+            @click="openNewBankDeposit('BCP')"
+          >
+            <Plus class="h-4 w-4" />
+            <span>Ingresar Capital Bancario</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Banking Institutions Catalog Grid (Accounts Overview) -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <CreditCard class="h-4 w-4 text-indigo-600" />
+              <span>Instituciones Bancarias y Fondos Operativos</span>
+            </h3>
+            <p class="text-xs text-slate-500">
+              Saldos asignados por banco para operaciones de depósitos y retiros en ventanilla y agentes
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              :disabled="store.loadingBankCapital"
+              @click="refreshBankCapital"
+            >
+              <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': store.loadingBankCapital }" />
+              <span>Actualizar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bank Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+          <div
+            v-for="acc in store.bankAccounts"
+            :key="acc.account_id"
+            class="rounded-xl border p-4 transition flex flex-col justify-between hover:shadow-xs"
+            :class="acc.status === 1 ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50/70 opacity-60'"
+          >
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span
+                  class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border"
+                  :class="getBankEntity(acc.bank_name)?.badgeClass || 'bg-slate-100 text-slate-700'"
+                >
+                  {{ acc.bank_name }}
+                </span>
+                <span class="text-[10px] font-mono text-slate-400">Cod: {{ acc.bank_code }}</span>
+              </div>
+
+              <div>
+                <p class="text-[10px] uppercase font-bold text-slate-400">Saldo Disponible</p>
+                <p class="text-lg font-extrabold font-mono text-slate-900">
+                  S/ {{ Number(acc.current_balance || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                </p>
+              </div>
+
+              <div class="text-[11px] text-slate-500 space-y-0.5 pt-1 border-t border-slate-100">
+                <p v-if="acc.account_number" class="font-mono text-slate-700 truncate" :title="acc.account_number">
+                  <span class="text-slate-400 font-sans">N°:</span> {{ acc.account_number }}
+                </p>
+                <p v-else class="text-slate-400 italic">Sin N° de cuenta registrado</p>
+                <p class="text-[10px] text-slate-400">
+                  Total depositado: S/ {{ Number(acc.total_deposited || 0).toFixed(2) }}
+                </p>
+              </div>
+            </div>
+
+            <div class="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-indigo-600 transition cursor-pointer"
+                @click="openEditBankAccount(acc)"
+              >
+                <Pencil class="h-3 w-3" />
+                <span>Editar</span>
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                @click="openNewBankDeposit(acc.bank_name)"
+              >
+                <Plus class="h-3 w-3" />
+                <span>+ Fondeo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. DETAILED TABLE TO LOG (AUDIT) EVERY CAPITAL DEPOSIT (CORE REQUIREMENT) -->
+      <div class="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div class="p-5 border-b border-slate-200 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Receipt class="h-4 w-4 text-indigo-600" />
+                <span>Registro de Auditoría de Depósitos de Capital Bancario</span>
+              </h3>
+              <p class="text-xs text-slate-500">
+                Historial inmutable y trazabilidad de ingresos de capital por institución y agencia bancaria para control de retiros y depósitos
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-xs cursor-pointer self-start sm:self-auto"
+              @click="openNewBankDeposit()"
+            >
+              <Plus class="h-3.5 w-3.5" />
+              <span>Nuevo Ingreso de Capital</span>
+            </button>
+          </div>
+
+          <!-- Filters Toolbar -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+            <!-- Search Text -->
+            <div class="relative lg:col-span-2">
+              <Search class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                v-model.trim="bankSearch"
+                type="text"
+                placeholder="Buscar por voucher, agencia bancaria, cuenta o código..."
+                class="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden transition"
+                @keydown.enter="applyBankFilters"
+              />
+            </div>
+
+            <!-- Filter by Bank Entity -->
+            <div>
+              <select
+                v-model="bankEntityFilter"
+                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden transition"
+                @change="applyBankFilters"
+              >
+                <option value="all">Todas las Entidades Bancarias</option>
+                <option v-for="b in bankList" :key="b.name" :value="b.name">
+                  {{ b.name }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Date Range: Start -->
+            <div>
+              <input
+                v-model="bankStartDate"
+                type="date"
+                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden transition"
+                title="Fecha desde"
+                @change="applyBankFilters"
+              />
+            </div>
+
+            <!-- Date Range: End -->
+            <div class="flex items-center gap-2">
+              <input
+                v-model="bankEndDate"
+                type="date"
+                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:outline-hidden transition"
+                title="Fecha hasta"
+                @change="applyBankFilters"
+              />
+              <button
+                type="button"
+                class="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition cursor-pointer"
+                title="Restablecer filtros"
+                @click="resetBankFilters"
+              >
+                <RotateCcw class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Table -->
+        <div class="overflow-x-auto">
+          <div v-if="store.loadingBankCapital && store.bankDeposits.length === 0" class="py-12 text-center">
+            <Loader2 class="h-8 w-8 text-indigo-600 animate-spin mx-auto" />
+            <p class="text-xs text-slate-500 mt-2">Cargando registros de auditoría de capital bancario...</p>
+          </div>
+
+          <div v-else-if="store.bankDeposits.length === 0" class="py-12 text-center">
+            <Landmark class="h-10 w-10 text-slate-300 mx-auto" />
+            <p class="text-sm font-bold text-slate-700 mt-2">No se encontraron registros de capital</p>
+            <p class="text-xs text-slate-400 mt-1">Registra tu primer ingreso de capital haciendo clic en "Nuevo Ingreso de Capital".</p>
+          </div>
+
+          <table v-else class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Código / Fecha</th>
+                <th class="py-3 px-4">Entidad Bancaria</th>
+                <th class="py-3 px-4">Sucursal / Agencia Bancaria (Depósito)</th>
+                <th class="py-3 px-4">N° Operación / Voucher</th>
+                <th class="py-3 px-4">Cuenta Destino</th>
+                <th class="py-3 px-4 text-right">Monto Depositado</th>
+                <th class="py-3 px-4 text-center">Trazabilidad Saldo</th>
+                <th class="py-3 px-4">Origen Fondos</th>
+                <th class="py-3 px-4">Sucursal / Auditor</th>
+                <th class="py-3 px-4">Observaciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr
+                v-for="d in store.bankDeposits"
+                :key="d.deposit_id"
+                class="hover:bg-slate-50/70 transition"
+              >
+                <!-- Code & Date -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <span class="font-mono font-bold text-slate-900 block">{{ d.deposit_code }}</span>
+                  <span class="text-[11px] text-slate-400">{{ formatDateTime(d.deposit_date) }}</span>
+                </td>
+
+                <!-- Bank Entity Badge -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border"
+                    :class="getBankEntity(d.bank_name)?.badgeClass || 'bg-slate-100 text-slate-700'"
+                  >
+                    {{ d.bank_name }}
+                  </span>
+                </td>
+
+                <!-- Specific Bank Branch / Agency where deposited (CORE REQUIREMENT) -->
+                <td class="py-3 px-4">
+                  <div class="flex items-start gap-1.5 max-w-xs">
+                    <MapPin class="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p class="font-bold text-slate-900 text-xs leading-snug">{{ d.bank_branch }}</p>
+                      <span class="text-[10px] text-slate-400">Sede receptora de fondos</span>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Voucher / Operation Number -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <div v-if="d.voucher_number" class="inline-flex items-center gap-1 font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
+                    <Receipt class="h-3 w-3 text-slate-400" />
+                    {{ d.voucher_number }}
+                  </div>
+                  <span v-else class="text-slate-400 italic">—</span>
+                </td>
+
+                <!-- Account Number -->
+                <td class="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-slate-600">
+                  {{ d.account_number || '—' }}
+                </td>
+
+                <!-- Amount Deposited -->
+                <td class="py-3 px-4 text-right whitespace-nowrap">
+                  <span class="font-mono font-extrabold text-emerald-700 text-xs">
+                    + S/ {{ Number(d.amount).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </span>
+                </td>
+
+                <!-- Balance Before -> After Trace -->
+                <td class="py-3 px-4 text-center whitespace-nowrap font-mono text-[11px]">
+                  <span class="text-slate-500">S/ {{ Number(d.balance_before).toFixed(2) }}</span>
+                  <span class="text-slate-400 mx-1">→</span>
+                  <strong class="text-indigo-900 font-bold">S/ {{ Number(d.balance_after).toFixed(2) }}</strong>
+                </td>
+
+                <!-- Funding Source -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <span
+                    class="inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold"
+                    :class="d.funding_source === 'Transferencia desde Caja General' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'"
+                  >
+                    {{ d.funding_source }}
+                  </span>
+                </td>
+
+                <!-- Business Branch & Username -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <p class="font-semibold text-slate-800">{{ d.branch_name }}</p>
+                  <p class="text-[10px] text-slate-400">Por: {{ d.username }}</p>
+                </td>
+
+                <!-- Notes -->
+                <td class="py-3 px-4 max-w-xs truncate text-[11px] text-slate-500" :title="d.notes">
+                  {{ d.notes || '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination & Chunk Loading Footer -->
+        <DataTablePagination
+          :pagination="store.bankDepositsPagination"
+          :loading="store.loadingBankCapital"
+          :loaded-count="store.bankDeposits.length"
+          :chunk-mode="bankChunkMode"
+          entity-name="depósitos de capital"
+          @change-page="onBankPageChange"
+          @change-per-page="onBankPerPageChange"
+          @load-next-chunk="onBankLoadNextChunk"
+          @update:chunk-mode="bankChunkMode = $event"
+        />
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 3: SUCURSALES (MULTI-TENANT CRUD)                     -->
     <!-- ========================================================= -->
     <section v-else-if="activeTab === 'branches'" class="space-y-5">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -933,6 +1327,27 @@
       @close="voidTarget = null"
       @confirm="confirmVoidMovement"
     />
+
+    <BankCapitalDepositModal
+      :open="bankDepositModalOpen"
+      :initial-bank="bankInitialEntity"
+      :branches="store.branches"
+      :active-branch-id="inspectedBranchId"
+      :can-switch-branches="store.canSwitchBranches"
+      :accounts="store.bankAccounts"
+      :general-cash-balance="Number(store.bankSummary.general_cash_balance || 0)"
+      :submitting="store.submittingBankDeposit"
+      @close="bankDepositModalOpen = false"
+      @submit="handleSaveBankDeposit"
+    />
+
+    <BankCapitalAccountModal
+      :open="bankAccountModalOpen"
+      :account="editingBankAccount"
+      :submitting="savingBankAccount"
+      @close="bankAccountModalOpen = false"
+      @submit="handleSaveBankAccount"
+    />
   </div>
 </template>
 
@@ -963,6 +1378,14 @@ import {
   ShieldCheck,
   CheckCircle2,
   Upload,
+  MapPin,
+  Receipt,
+  Calendar,
+  Filter,
+  RotateCcw,
+  CreditCard,
+  Download,
+  Layers,
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSystemConfigStore } from '@/stores/systemConfig'
@@ -970,13 +1393,17 @@ import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
 import { formatCurrency, formatDateTime, generalCashMovementMeta } from '@/utils/formatters'
 import { findUnsafeField, sanitizeObject } from '@/utils/security'
+import { BANK_ENTITIES, getBankEntity, getBankBadgeClass } from '@/utils/bankEntities'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import BranchFormModal from '@/components/system/BranchFormModal.vue'
 import GeneralCashMovementModal from '@/components/system/GeneralCashMovementModal.vue'
 import GeneralCashConfigModal from '@/components/system/GeneralCashConfigModal.vue'
+import BankCapitalDepositModal from '@/components/system/BankCapitalDepositModal.vue'
+import BankCapitalAccountModal from '@/components/system/BankCapitalAccountModal.vue'
+import DataTablePagination from '@/components/common/DataTablePagination.vue'
 
-const VALID_TABS = ['general-cash', 'branches', 'settings']
+const VALID_TABS = ['general-cash', 'bank-capital', 'branches', 'settings']
 
 const route = useRoute()
 const router = useRouter()
@@ -1009,6 +1436,21 @@ const deletingBranchLoading = ref(false)
 const savingSettings = ref(false)
 const logoFileInput = ref(null)
 const uploadingLogo = ref(false)
+
+// Bank Capital & Audit Deposits State
+const bankList = BANK_ENTITIES
+const bankSearch = ref('')
+const bankEntityFilter = ref('all')
+const bankStartDate = ref('')
+const bankEndDate = ref('')
+const bankChunkMode = ref(false)
+const bankPage = ref(1)
+const bankPerPage = ref(25)
+const bankDepositModalOpen = ref(false)
+const bankInitialEntity = ref('BCP')
+const bankAccountModalOpen = ref(false)
+const editingBankAccount = ref(null)
+const savingBankAccount = ref(false)
 
 function resolveLogoUrl(path) {
   if (!path) return ''
@@ -1257,6 +1699,102 @@ async function submitSystemSettings() {
   }
 }
 
+async function loadBankCapital(page = 1, appendChunk = false) {
+  try {
+    await store.fetchBankCapital({
+      branchId: inspectedBranchId.value,
+      bankName: bankEntityFilter.value,
+      search: bankSearch.value,
+      startDate: bankStartDate.value,
+      endDate: bankEndDate.value,
+      page,
+      limit: bankPerPage.value,
+    }, appendChunk)
+  } catch (err) {
+    ui.error(extractErrorMessage(err))
+  }
+}
+
+async function refreshBankCapital() {
+  bankPage.value = 1
+  await loadBankCapital(1, false)
+}
+
+function applyBankFilters() {
+  bankPage.value = 1
+  loadBankCapital(1, false)
+}
+
+function resetBankFilters() {
+  bankSearch.value = ''
+  bankEntityFilter.value = 'all'
+  bankStartDate.value = ''
+  bankEndDate.value = ''
+  bankPage.value = 1
+  loadBankCapital(1, false)
+}
+
+function onBankPageChange(p) {
+  bankPage.value = p
+  loadBankCapital(p, false)
+}
+
+function onBankPerPageChange(size) {
+  bankPerPage.value = size
+  bankPage.value = 1
+  loadBankCapital(1, false)
+}
+
+function onBankLoadNextChunk() {
+  const current = store.bankDepositsPagination.current_chunk || bankPage.value
+  const next = current + 1
+  bankPage.value = next
+  loadBankCapital(next, true)
+}
+
+function openNewBankDeposit(bankName = 'BCP') {
+  bankInitialEntity.value = bankName
+  bankDepositModalOpen.value = true
+}
+
+function openEditBankAccount(acc) {
+  editingBankAccount.value = acc
+  bankAccountModalOpen.value = true
+}
+
+async function handleSaveBankDeposit(payload) {
+  try {
+    const res = await store.createBankCapitalDeposit(payload)
+    ui.success(res?.messages || 'Depósito de capital registrado exitosamente.')
+    bankDepositModalOpen.value = false
+    await loadBankCapital(1, false)
+  } catch (err) {
+    ui.error(extractErrorMessage(err))
+  }
+}
+
+async function handleSaveBankAccount(payload) {
+  savingBankAccount.value = true
+  try {
+    const res = await store.updateBankCapitalAccount(payload)
+    ui.success(res?.messages || 'Cuenta bancaria actualizada correctamente.')
+    bankAccountModalOpen.value = false
+  } catch (err) {
+    ui.error(extractErrorMessage(err))
+  } finally {
+    savingBankAccount.value = false
+  }
+}
+
+watch(
+  () => activeTab.value,
+  async (tab) => {
+    if (tab === 'bank-capital') {
+      await loadBankCapital(1, false)
+    }
+  }
+)
+
 onMounted(async () => {
   inspectedBranchId.value = Number(auth.activeBranch?.branch_id || 1)
   try {
@@ -1264,6 +1802,7 @@ onMounted(async () => {
       store.fetchSystemConfig(),
       store.fetchBranches(),
       store.fetchGeneralCash(inspectedBranchId.value),
+      store.fetchBankCapital({ branchId: inspectedBranchId.value }),
     ])
   } catch (err) {
     ui.error(extractErrorMessage(err))
