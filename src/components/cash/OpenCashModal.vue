@@ -7,15 +7,19 @@
     @close="$emit('close')"
   >
     <form id="openCashForm" class="space-y-4" @submit.prevent="submitForm">
-      <!-- Selección de Caja Registradora -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1.5">Caja registradora *</label>
+      <!-- Selección de Caja Registradora:
+           Solo se muestra el selector si la sucursal tiene más de una caja registrada y más de una disponible.
+           Si la sucursal solo tiene 1 caja registrada (o solo queda 1 disponible), se autoasigna y se muestra la tarjeta de caja única fija -->
+      <div v-if="hasMultipleRegistersInBranch && availableRegisters.length > 1">
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+          Caja registradora *
+        </label>
         <select
           v-model.number="form.registerId"
           required
           class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
         >
-          <option :value="0" disabled>-- Selecciona caja disponible --</option>
+          <option :value="0" disabled>-- Selecciona la caja a aperturar --</option>
           <option
             v-for="r in availableRegisters"
             :key="r.register_id"
@@ -24,9 +28,42 @@
             {{ r.register_code }} — {{ r.register_name }}{{ r.location ? ` (${r.location})` : '' }}
           </option>
         </select>
-        <p v-if="availableRegisters.length === 0" class="text-xs text-rose-600 mt-1">
-          No hay cajas disponibles en esta sucursal (todas están abiertas o inactivas).
+        <p class="text-xs text-slate-500 mt-1">
+          Esta sucursal dispone de múltiples cajas. Selecciona cuál vas a aperturar.
         </p>
+      </div>
+
+      <!-- Caja asignada automáticamente cuando la sucursal solo tiene 1 caja o solo queda 1 disponible -->
+      <div v-else-if="selectedRegister || singleAvailableRegister" class="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div
+            class="flex h-9 w-9 items-center justify-center rounded-lg font-bold"
+            :class="!hasMultipleRegistersInBranch ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'"
+          >
+            <Calculator class="h-4 w-4" />
+          </div>
+          <div>
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              {{ !hasMultipleRegistersInBranch ? 'Caja Única de Sucursal' : 'Caja a Aperturar' }}
+            </p>
+            <p class="text-sm font-bold text-slate-900">
+              {{ (selectedRegister || singleAvailableRegister).register_code }} — {{ (selectedRegister || singleAvailableRegister).register_name }}
+              <span v-if="(selectedRegister || singleAvailableRegister).location" class="text-xs text-slate-500 font-normal">
+                ({{ (selectedRegister || singleAvailableRegister).location }})
+              </span>
+            </p>
+          </div>
+        </div>
+        <span
+          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold border"
+          :class="!hasMultipleRegistersInBranch ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'"
+        >
+          {{ !hasMultipleRegistersInBranch ? 'Caja Única' : 'Disponible' }}
+        </span>
+      </div>
+
+      <div v-if="availableRegisters.length === 0" class="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700">
+        No hay cajas disponibles en esta sucursal (todas las cajas registradas ya tienen un turno abierto o están inactivas).
       </div>
 
       <!-- Tarjeta informativa de Moneda Oficial de Apertura -->
@@ -55,7 +92,7 @@
             Fondo inicial de apertura ({{ currencySymbol }}) *
           </label>
           <span class="text-xs text-slate-500 font-medium">
-            Solo {{ currencyName }} ({{ currencyCode }})
+            Solo en {{ currencyName }} ({{ currencyCode }})
           </span>
         </div>
         <div class="relative flex rounded-xl shadow-xs">
@@ -150,7 +187,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { Loader2 } from '@lucide/vue'
+import { Calculator, Loader2 } from '@lucide/vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCashRegisterStore } from '@/stores/cashRegister'
@@ -183,9 +220,30 @@ const form = reactive({
   openingNotes: '',
 })
 
+// Total registers configured in the current branch
+const branchRegisters = computed(() => props.registers || [])
+const hasMultipleRegistersInBranch = computed(() => branchRegisters.value.length > 1)
+
+// Available registers (active and currently without an open session)
 const availableRegisters = computed(() =>
-  (props.registers || []).filter((r) => Number(r.active) === 1 && !r.open_session_id)
+  branchRegisters.value.filter((r) => Number(r.active) === 1 && !r.open_session_id)
 )
+
+const singleAvailableRegister = computed(() => {
+  if (availableRegisters.value.length === 1) {
+    return availableRegisters.value[0]
+  }
+  return null
+})
+
+const selectedRegister = computed(() => {
+  if (!form.registerId) return null
+  return (
+    availableRegisters.value.find((r) => r.register_id === form.registerId) ||
+    branchRegisters.value.find((r) => r.register_id === form.registerId) ||
+    null
+  )
+})
 
 const currencyCode = computed(() => {
   return (

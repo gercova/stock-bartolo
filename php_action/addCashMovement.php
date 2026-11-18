@@ -4,6 +4,9 @@ require_once __DIR__ . '/core.php';
 require_method(['POST']);
 
 $branchId   = get_active_branch_id($connect);
+$activeBranch = get_active_branch($connect);
+$sysConfig  = sb_get_system_config($connect);
+$currencySymbol = !empty($activeBranch['currency_symbol']) ? $activeBranch['currency_symbol'] : ($sysConfig['default_currency_symbol'] ?? 'S/');
 $userId     = (int)$_SESSION['userId'];
 $data       = get_request_data();
 
@@ -43,7 +46,7 @@ try {
 
     $expectedNow = round((float)$sess['opening_amount'] + (float)$sess['cash_in_total'] - (float)$sess['cash_out_total'], 2);
     if ($direction === 'out' && $amount > $expectedNow + 0.0001) {
-        throw new InvalidArgumentException('El efectivo esperado en gaveta ($' . number_format($expectedNow, 2) . ') es menor al retiro solicitado.');
+        throw new InvalidArgumentException("El efectivo esperado en gaveta ({$currencySymbol}" . number_format($expectedNow, 2) . ") es menor al retiro solicitado.");
     }
 
     $paymentMethod  = 2; // Cash
