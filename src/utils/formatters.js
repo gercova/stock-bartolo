@@ -10,15 +10,32 @@ export function formatCurrency(amount, currencyOverride = null) {
   const num = Number(amount) || 0
   const code = (currencyOverride || activeCurrencyCode || 'USD').toUpperCase()
   try {
-    return new Intl.NumberFormat('es-SV', {
+    const locale = code === 'PEN' ? 'es-PE' : 'es-SV'
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: code,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(num)
   } catch {
-    return `${activeCurrencySymbol}${num.toFixed(2)}`
+    const sym = code === 'PEN' ? 'S/' : (code === 'USD' ? '$' : activeCurrencySymbol)
+    return `${sym} ${num.toFixed(2)}`
   }
+}
+
+export function formatCompactDateTime(dateTimeStr) {
+  if (!dateTimeStr) return '—'
+  const normalized = String(dateTimeStr).includes('T')
+    ? dateTimeStr
+    : String(dateTimeStr).replace(' ', 'T')
+  const d = new Date(normalized)
+  if (Number.isNaN(d.getTime())) return dateTimeStr
+  const day = String(d.getDate()).padStart(2, '0')
+  const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic']
+  const month = monthNames[d.getMonth()] || ''
+  const hours = String(d.getHours()).padStart(2, '0')
+  const mins = String(d.getMinutes()).padStart(2, '0')
+  return `${day} ${month}, ${hours}:${mins}`
 }
 
 export function formatDate(dateStr) {

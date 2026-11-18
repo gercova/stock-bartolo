@@ -294,52 +294,83 @@
           </div>
 
           <template v-else>
-            <!-- Desktop Table -->
-            <div class="hidden xl:block overflow-x-auto">
-              <table class="w-full text-left text-sm">
-                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+            <!-- Desktop, Laptop & Tablet Table (Sin barra de scroll horizontal en laptops, PCs ni tablets) -->
+            <div class="hidden md:block w-full overflow-hidden no-scrollbar">
+              <table class="w-full text-left text-xs table-auto">
+                <thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500 select-none">
                   <tr>
-                    <th class="px-4 py-3.5">Turno</th>
-                    <th class="px-4 py-3.5">Caja</th>
-                    <th class="px-4 py-3.5">Entidad</th>
-                    <th class="px-4 py-3.5">Apertura / Cierre</th>
-                    <th class="px-4 py-3.5 text-right">Inicial</th>
-                    <th class="px-4 py-3.5 text-right">Esperado</th>
-                    <th class="px-4 py-3.5 text-right">Contado</th>
-                    <th class="px-4 py-3.5 text-right">Diferencia</th>
-                    <th class="px-4 py-3.5 text-right">A C. General</th>
-                    <th class="px-4 py-3.5">Estado</th>
-                    <th class="px-4 py-3.5 text-right">Acciones</th>
+                    <th class="px-2 py-2.5">Turno</th>
+                    <th class="px-1.5 py-2.5">Caja</th>
+                    <th class="px-1.5 py-2.5 text-center hidden xl:table-cell">Entidad</th>
+                    <th class="px-1.5 py-2.5">Apertura / Cierre</th>
+                    <th class="px-1.5 py-2.5 text-right hidden xl:table-cell">Inicial</th>
+                    <th class="px-1.5 py-2.5 text-right">Esperado</th>
+                    <th class="px-1.5 py-2.5 text-right">Contado</th>
+                    <th class="px-1.5 py-2.5 text-right">Diferencia</th>
+                    <th class="px-1.5 py-2.5 text-right hidden xl:table-cell" title="Monto retornado a Caja General">A C. Gral</th>
+                    <th class="px-1.5 py-2.5 text-center">Estado</th>
+                    <th class="px-2 py-2.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                   <tr v-for="s in filteredSessions" :key="s.session_id" class="hover:bg-slate-50/70 transition">
-                    <td class="px-4 py-3.5 font-mono text-xs font-bold text-indigo-700">{{ s.session_code }}</td>
-                    <td class="px-4 py-3.5">
-                      <p class="font-semibold text-slate-900">{{ s.register_name }}</p>
-                      <p class="text-xs text-slate-500">{{ s.register_code }}</p>
+                    <td class="px-2 py-2 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">
+                      {{ s.session_code }}
                     </td>
-                    <td class="px-4 py-3.5">
+                    <td class="px-1.5 py-2">
+                      <p class="font-bold text-slate-900 leading-tight truncate max-w-[85px]" :title="s.register_name">
+                        {{ s.register_name }}
+                      </p>
+                      <div class="flex items-center gap-1 mt-0.5">
+                        <span class="text-[10px] text-slate-400 font-mono">{{ s.register_code }}</span>
+                        <span
+                          v-if="s.bank_entity"
+                          class="xl:hidden inline-flex items-center rounded px-1 py-0.2 text-[9px] font-bold border truncate max-w-[55px]"
+                          :class="getBankBadgeClass(s.bank_entity)"
+                          :title="s.bank_entity"
+                        >
+                          {{ s.bank_entity }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="px-1.5 py-2 text-center whitespace-nowrap hidden xl:table-cell">
                       <span
-                        class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold border"
+                        class="inline-flex items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border truncate max-w-[70px]"
                         :class="getBankBadgeClass(s.bank_entity)"
+                        :title="s.bank_entity || 'Multibanco'"
                       >
-                        {{ s.bank_entity || 'BCP' }}
+                        {{ s.bank_entity || 'Multibanco' }}
                       </span>
                     </td>
-                    <td class="px-4 py-3.5 text-xs text-slate-600">
-                      <p>Ap: {{ formatDateTime(s.opened_at) }} ({{ s.opened_by_name }})</p>
-                      <p v-if="s.closed_at" class="text-slate-500">
-                        Ci: {{ formatDateTime(s.closed_at) }} ({{ s.closed_by_name || 'Sistema' }})
-                      </p>
+                    <td class="px-1.5 py-2 text-slate-600 text-[11px]">
+                      <div :title="`Apertura: ${formatDateTime(s.opened_at)} (${s.opened_by_name})`">
+                        <p class="text-slate-800 leading-tight whitespace-nowrap font-medium">
+                          <span class="font-bold text-slate-400">Ap:</span> {{ formatCompactDateTime(s.opened_at) }}
+                        </p>
+                        <p class="text-[10px] text-slate-400 leading-tight truncate max-w-[85px]">
+                          {{ s.opened_by_name }}
+                        </p>
+                      </div>
+                      <div v-if="s.closed_at" class="mt-0.5" :title="`Cierre: ${formatDateTime(s.closed_at)} (${s.closed_by_name || 'Sistema'})`">
+                        <p class="text-slate-600 leading-tight whitespace-nowrap font-medium">
+                          <span class="font-bold text-slate-400">Ci:</span> {{ formatCompactDateTime(s.closed_at) }}
+                        </p>
+                        <p class="text-[10px] text-slate-400 leading-tight truncate max-w-[85px]">
+                          {{ s.closed_by_name || 'Sistema' }}
+                        </p>
+                      </div>
                     </td>
-                    <td class="px-4 py-3.5 text-right text-slate-700">{{ formatCurrency(s.opening_amount) }}</td>
-                    <td class="px-4 py-3.5 text-right font-semibold text-slate-900">{{ formatCurrency(s.expected_cash) }}</td>
-                    <td class="px-4 py-3.5 text-right font-semibold text-slate-900">
+                    <td class="px-1.5 py-2 text-right font-medium text-slate-700 whitespace-nowrap hidden xl:table-cell">
+                      {{ formatCurrency(s.opening_amount) }}
+                    </td>
+                    <td class="px-1.5 py-2 text-right font-bold text-slate-900 whitespace-nowrap">
+                      {{ formatCurrency(s.expected_cash) }}
+                    </td>
+                    <td class="px-1.5 py-2 text-right font-medium text-slate-800 whitespace-nowrap">
                       {{ s.counted_cash !== null ? formatCurrency(s.counted_cash) : '—' }}
                     </td>
                     <td
-                      class="px-4 py-3.5 text-right font-bold"
+                      class="px-1.5 py-2 text-right font-bold whitespace-nowrap"
                       :class="
                         s.difference_amount === null
                           ? 'text-slate-400'
@@ -356,40 +387,48 @@
                           : `${s.difference_amount > 0 ? '+' : ''}${formatCurrency(s.difference_amount)}`
                       }}
                     </td>
-                    <td class="px-4 py-3.5 text-right text-slate-700">
+                    <td class="px-1.5 py-2 text-right font-medium text-slate-700 whitespace-nowrap hidden xl:table-cell">
                       {{ s.status === 'closed' ? formatCurrency(s.amount_returned_general) : '—' }}
                     </td>
-                    <td class="px-4 py-3.5">
-                      <StatusBadge
-                        :variant="s.status === 'open' ? 'success' : 'neutral'"
-                        :label="s.status === 'open' ? 'Abierto' : 'Cerrado'"
-                      />
+                    <td class="px-1.5 py-2 text-center whitespace-nowrap">
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                        :class="s.status === 'open' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'"
+                      >
+                        <span class="h-1.5 w-1.5 rounded-full" :class="s.status === 'open' ? 'bg-emerald-500' : 'bg-slate-400'"></span>
+                        {{ s.status === 'open' ? 'Abierto' : 'Cerrado' }}
+                      </span>
                     </td>
-                    <td class="px-4 py-3.5 text-right">
-                      <div class="inline-flex items-center gap-1">
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                      <div class="inline-flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 inline-flex items-center gap-1"
+                          title="Ver detalle del turno"
+                          class="h-7 w-7 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 inline-flex items-center justify-center transition shadow-2xs cursor-pointer"
                           @click="openDetailModal(s.session_id)"
                         >
                           <Eye class="h-3.5 w-3.5" />
-                          Detalle
+                          <span class="sr-only">Detalle</span>
                         </button>
                         <button
                           v-if="s.status === 'open'"
                           type="button"
-                          class="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50"
+                          title="Realizar arqueo / conciliación"
+                          class="h-7 w-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-400 inline-flex items-center justify-center transition shadow-2xs cursor-pointer"
                           @click="openReconcileModal(s)"
                         >
-                          Arqueo
+                          <Calculator class="h-3.5 w-3.5" />
+                          <span class="sr-only">Arqueo</span>
                         </button>
                         <button
                           v-if="s.status === 'open'"
                           type="button"
-                          class="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                          title="Cerrar turno de caja"
+                          class="h-7 w-7 rounded-lg border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-400 inline-flex items-center justify-center transition shadow-2xs cursor-pointer"
                           @click="openCloseModal(s)"
                         >
-                          Cerrar
+                          <Lock class="h-3.5 w-3.5" />
+                          <span class="sr-only">Cerrar</span>
                         </button>
                       </div>
                     </td>
@@ -398,8 +437,8 @@
               </table>
             </div>
 
-            <!-- Mobile & Tablet Cards -->
-            <div class="xl:hidden divide-y divide-slate-100">
+            <!-- Mobile Cards (Solo pantallas pequeñas < md) -->
+            <div class="md:hidden divide-y divide-slate-100">
               <div v-for="s in filteredSessions" :key="s.session_id" class="p-4 space-y-3">
                 <div class="flex items-start justify-between gap-2">
                   <div>
@@ -680,7 +719,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useCashRegisterStore } from '@/stores/cashRegister'
 import { useUiStore } from '@/stores/ui'
 import { extractErrorMessage } from '@/api/client'
-import { formatCurrency, formatDateTime } from '@/utils/formatters'
+import { formatCurrency, formatDateTime, formatCompactDateTime } from '@/utils/formatters'
 import { getBankBadgeClass, getBankEntity } from '@/utils/bankEntities'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
@@ -836,4 +875,14 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+</style>
 
