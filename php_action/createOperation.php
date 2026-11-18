@@ -20,14 +20,12 @@ $destinationAccount = sanitize_clean_text($data['destination_account'] ?? $data[
 // Enforce open cash register for all commercial operations across all branches
 $openSession = sb_get_open_cash_session($connect, $branchId, $sourceBankEntity);
 if (!$openSession) {
-    $anySession = sb_get_open_cash_session($connect, $branchId);
+    $openSession = sb_get_open_cash_session($connect, $branchId);
+}
+if (!$openSession) {
     $activeBranch = get_active_branch($connect);
     $bName = $activeBranch['branch_name'] ?? 'esta sucursal';
-    if (!$anySession) {
-        send_http_error(400, "Para registrar depósitos o retiros en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
-    } else {
-        send_http_error(400, "No se encontró una caja abierta para el fondo bancario '{$sourceBankEntity}' en {$bName}. Hay turno abierto en caja: {$anySession['register_name']} ({$anySession['bank_entity']}). Por favor, abre una caja asignada a {$sourceBankEntity} o selecciona una entidad con caja abierta.");
-    }
+    send_http_error(400, "Para registrar depósitos o retiros en {$bName}, la caja registradora debe estar abierta. Por favor, abre un turno de caja para esta ubicación.");
 }
 
 $sessionId = (int)$openSession['session_id'];

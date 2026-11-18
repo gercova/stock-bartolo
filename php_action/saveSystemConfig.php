@@ -77,6 +77,13 @@ if (!$stmt->execute()) {
 }
 $stmt->close();
 
+$updBranch = $connect->prepare('UPDATE branches SET currency_code = ?, currency_symbol = ? WHERE is_main = 1');
+if ($updBranch) {
+    $updBranch->bind_param('ss', $defaultCurrencyCode, $defaultCurrencySymbol);
+    $updBranch->execute();
+    $updBranch->close();
+}
+
 $config = sb_get_system_config($connect);
 $connect->close();
 

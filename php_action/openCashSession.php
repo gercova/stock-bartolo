@@ -7,6 +7,10 @@ $branchId       = get_active_branch_id($connect);
 $activeBranch   = get_active_branch($connect);
 $userId         = (int)$_SESSION['userId'];
 $data           = get_request_data();
+$sysConfig      = sb_get_system_config($connect);
+
+$currencySymbol = !empty($activeBranch['currency_symbol']) ? $activeBranch['currency_symbol'] : ($sysConfig['default_currency_symbol'] ?? 'S/');
+$currencyCode   = !empty($activeBranch['currency_code']) ? $activeBranch['currency_code'] : ($sysConfig['default_currency_code'] ?? 'PEN');
 
 $registerId             = (int)($data['registerId'] ?? 0);
 $openingAmount          = round((float)($data['openingAmount'] ?? 0), 2);
@@ -15,7 +19,7 @@ $openingNotes           = sanitize_clean_text($data['openingNotes'] ?? '', 'nota
 $rawBankEntity          = sanitize_clean_text($data['bankEntity'] ?? '', 'entidad bancaria', 60, false);
 
 if ($registerId <= 0 || $openingAmount < 0) {
-    send_http_error(400, 'Selecciona una caja válida e indica un monto de apertura mayor o igual a $0.00.');
+    send_http_error(400, "Selecciona una caja válida e indica un monto de apertura mayor o igual a {$currencySymbol}0.00.");
 }
 
 sb_ensure_branch_cash_defaults($connect, $branchId, $activeBranch['branch_name'], 0.0, $userId);
@@ -36,14 +40,16 @@ try {
         throw new InvalidArgumentException('La caja registradora seleccionada está inactiva.');
     }
 
-    $bankEntity = $rawBankEntity !== '' ? $rawBankEntity : ($reg['bank_entity'] ?: 'BCP');
+    $bankEntity = $rawBankEntity !== '' ? $rawBankEntity : ($reg['bank_entity'] ?: 'Multibanco');
     $bankCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $bankEntity), 0, 16));
 
-    // Persist chosen bank entity on register
-    $updRegBank = $connect->prepare('UPDATE cash_registers SET bank_entity = ? WHERE register_id = ?');
-    $updRegBank->bind_param('si', $bankEntity, $registerId);
-    $updRegBank->execute();
-    $updRegBank->close();
+    if ($rawBankEntity !== '') {
+        // Persist chosen bank entity on register only if explicitly passed
+        $updRegBank = $connect->prepare('UPDATE cash_registers SET bank_entity = ? WHERE register_id = ?');
+        $updRegBank->bind_param('si', $bankEntity, $registerId);
+        $updRegBank->execute();
+        $updRegBank->close();
+    }
 
     $openChk = $connect->prepare("SELECT session_id FROM cash_sessions WHERE register_id = ? AND branch_id = ? AND status = 'open' LIMIT 1 FOR UPDATE");
     $openChk->bind_param('ii', $registerId, $branchId);
@@ -69,7 +75,7 @@ try {
         }
         $balanceBefore = round((float)$accRow['current_balance'], 2);
         if ($openingAmount > $balanceBefore + 0.0001) {
-            throw new InvalidArgumentException('Saldo insuficiente en Caja General ($' . number_format($balanceBefore, 2) . ' disponible) para asignar $' . number_format($openingAmount, 2) . '.');
+            throw new InvalidArgumentException("Saldo insuficiente en Caja General ({$currencySymbol}" . number_format($balanceBefore, 2) . " disponible) para asignar {$currencySymbol}" . number_format($openingAmount, 2) . ".");
         }
     }
 
@@ -111,10 +117,12 @@ try {
 
     json_response([
         'success' => true,
-        'messages' => "Caja {$reg['register_name']} abierta exitosamente ({$sessionCode}) para entidad {$bankEntity}",
+        'messages' => "Caja {$reg['register_name']} abierta exitosamente ({$sessionCode}) con fondo inicial de {$currencySymbol} " . number_format($openingAmount, 2),
         'session_id' => $sessionId,
         'session_code' => $sessionCode,
         'bank_entity' => $bankEntity,
+        'currency_symbol' => $currencySymbol,
+        'currency_code' => $currencyCode,
     ], 201);
 } catch (InvalidArgumentException $e) {
     $connect->rollback();

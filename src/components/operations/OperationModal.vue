@@ -582,10 +582,10 @@
             <span>Fondos insuficientes para retiro</span>
           </div>
           <p v-if="!activeSourceSession">
-            No hay una caja registradora abierta para la entidad bancaria <strong>{{ form.source_bank_entity }}</strong> en esta sucursal. Abre una caja asignada a esta entidad antes de procesar el retiro.
+            No hay una caja registradora abierta en esta sucursal. Abre un turno de caja antes de procesar el retiro.
           </p>
           <p v-else>
-            La caja asignada a <strong>{{ form.source_bank_entity }} ({{ activeSourceSession.register_name }})</strong> dispone de <strong>S/ {{ Number(activeSourceSession.expected_cash || 0).toFixed(2) }}</strong>, pero se requieren <strong>S/ {{ Number(cashRequired).toFixed(2) }}</strong> para completar este retiro.
+            La caja registradora <strong>{{ activeSourceSession.register_name }}</strong> dispone de <strong>S/ {{ Number(activeSourceSession.expected_cash || 0).toFixed(2) }}</strong>, pero se requieren <strong>S/ {{ Number(cashRequired).toFixed(2) }}</strong> para completar este retiro.
           </p>
         </div>
 
@@ -707,11 +707,12 @@ const form = reactive({
 })
 
 const activeSourceSession = computed(() => {
-  return (
-    (cashStore.openSessions || []).find(
-      (s) => (s.bank_entity || '').toLowerCase() === (form.source_bank_entity || '').toLowerCase()
-    ) || null
+  const sessions = cashStore.openSessions || []
+  if (sessions.length === 0) return null
+  const bankMatch = sessions.find(
+    (s) => (s.bank_entity || '').toLowerCase() === (form.source_bank_entity || '').toLowerCase()
   )
+  return bankMatch || sessions[0]
 })
 
 function getOpenBankSessionText(bankName) {
@@ -720,6 +721,10 @@ function getOpenBankSessionText(bankName) {
   )
   if (sess) {
     return `[${sess.register_name} · S/ ${Number(sess.expected_cash || 0).toFixed(2)}]`
+  }
+  if ((cashStore.openSessions || []).length > 0) {
+    const s0 = cashStore.openSessions[0]
+    return `[${s0.register_name} · S/ ${Number(s0.expected_cash || 0).toFixed(2)}]`
   }
   return ''
 }

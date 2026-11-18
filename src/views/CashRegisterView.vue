@@ -615,6 +615,8 @@
       :general-cash-balance="Number(store.generalCash?.current_balance || 0)"
       :auto-fund-default="Boolean(store.systemConfig?.auto_fund_till_from_general_cash ?? true)"
       :branch-name="activeBranch?.branch_name || ''"
+      :currency-code="activeBranch?.currency_code || store.systemConfig?.default_currency_code || 'PEN'"
+      :currency-symbol="activeBranch?.currency_symbol || store.systemConfig?.default_currency_symbol || 'S/'"
       @close="openModalOpen = false"
     />
 
